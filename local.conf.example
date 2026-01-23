@@ -1,0 +1,16 @@
+[[local|localrc]]
+#Passwords
+ADMIN_PASSWORD=<your-password-here>
+DATABASE_PASSWORD=$ADMIN_PASSWORD
+RABBIT_PASSWORD=$ADMIN_PASSWORD
+SERVICE_PASSWORD=$ADMIN_PASSWORD
+
+#Network
+HOST_IP=$(ip route get 8.8.8.8 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
+
+#Logging
+LOGFILE=$DEST/logs/stack.sh.log
+LOGDAYS=10
+
+#Reclone
+RECLONE=no
