@@ -1,10 +1,10 @@
-# Cloud Infrastructure as Code
+# OpenStack to Kubernetes Pipeline
 
-This repository demonstrates deploying OpenStack infrastructure in three ways: manually with DevStack, understanding the OpenStack architecture, and automating deployment with Terraform.
+Because clicking buttons in Horizon gets old fast.
 
 ---
 
-## 1. DevStack Installation (local.conf)
+## Week 1: DevStack Installation (local.conf)
 
 The **local.conf** file is used to automate OpenStack installation using DevStack, a development setup script.
 
@@ -34,11 +34,11 @@ The `local.conf` file contains:
 
 ---
 
-## 2. OpenStack Architecture
+## OpenStack Architecture
 
 ### VM Creation Flow
 
-![VM Creation Flow](./first_pic.png)
+![VM Creation Flow](first_pic.png)
 
 This diagram shows how a virtual machine is created in OpenStack:
 1. **Horizon** - Web dashboard receives the request
@@ -48,7 +48,7 @@ This diagram shows how a virtual machine is created in OpenStack:
 
 ### Service Architecture
 
-![Service Database Architecture](./second_pic.png)
+![Service Database Architecture](second_pic.png)
 
 OpenStack follows a modular architecture where:
 - Each service (Keystone, Nova, Neutron, etc.) has its own database
@@ -58,76 +58,91 @@ OpenStack follows a modular architecture where:
 
 ---
 
-## 3. Infrastructure as Code with Terraform
+## Week 2: Automating the Infrastructure
 
-Instead of manually configuring OpenStack with DevStack, we use **Terraform** to define and deploy infrastructure automatically.
+### Part 1: Manual Kubernetes Install
 
-### What is main.tf?
+Followed "Kubernetes The Hard Way" to understand what actually happens under the hood. With Terraform, I set up a 3-node cluster (1 control plane, 2 workers) on OpenStack VMs.
 
-The **main.tf** file contains:
-- **Provider configuration** - Connects to OpenStack
-- **Data sources** - Looks up images and flavors dynamically
-- **Variables** - Customizable parameters for deployment
-- **Resources** - Defines the compute instance to create
+Learned about certificates, kubeconfig files, etcd, and why networking is always the hard part.
 
-### Key Components
+### Part 2: Terraform All The Things
 
-**Variables:**
-- `instance_name` - Name of the VM (default: "basic")
-- `network_name` - Network to attach to (default: "shared")
-- `security_groups` - Firewall rules (default: ["default"])
+Expanded my terraform so that the VMs are 100% for Ansible to take it from there (they can communicate with each other on the private network, and I can SSH into them from the jumpbox [floating IPs are already generated and attached]).
 
-**Resources:**
-- Creates a Cirros 0.6.3 compute instance
-- Deploys on m1.nano flavor
-- Attaches to a specified network
-- Applies security groups
+**File structure:**
+```
+├── providers.tf        
+├── variables.tf        
+├── data.tf             
+├── compute.tf          
+├── network.tf          
+├── outputs.tf         
+├── ansible.tf          
+├── terraform.tfvars    
+└── ansible/            # Next: automate K8s install (work in progress)
+```
+
+**What it does:**
+- Spins up 3 Debian 12 VMs (m1.small, 2GB RAM each)
+- Creates security groups so nodes can actually talk to each other (on all protocols, not just ping)
+- Assigns floating IPs for SSH access
+- Generates an Ansible inventory file automatically
+
+**The security group gotcha:**
+Initially nodes could ping each other but TCP was blocked. Fixed by creating a `k8s_internal` security group with `remote_group_id` pointing to itself. Basically "trust anything in this group."
+
+Validated with a quick test script - all nodes can now communicate properly.
 
 ### Usage
 
-**Initialize Terraform:**
+Source credentials first (always forget this):
+```bash
+source /opt/stack/devstack/openrc admin admin
+```
+
+Then the usual Terraform dance:
 ```bash
 terraform init
-```
-
-**Plan the deployment:**
-```bash
 terraform plan
-```
-
-**Deploy:**
-```bash
 terraform apply
 ```
 
-**Destroy resources:**
-```bash
-terraform destroy
-```
+Terraform generates `inventory.ini` automatically with all the node IPs. Ready for Ansible.
 
-**Deploy with custom variables:**
-```bash
-terraform apply -var="instance_name=my-vm" -var="security_groups=[\"default\",\"web\"]"
-```
+### Next: Ansible Playbooks
 
-### Why Terraform Instead of Manual DevStack?
-
-- **Reproducible** - Same infrastructure every time
-- **Version controlled** - Track infrastructure changes in git
-- **Scalable** - Deploy multiple instances easily
-- **Documented** - Code serves as documentation
-- **Idempotent** - Safe to run multiple times
+Currently writing Ansible to handle the cluster setup.
 
 ---
 
-## Prerequisites
+## What Changed from the Simple Version
 
-- OpenStack environment (with credentials configured)
-- [Terraform](https://www.terraform.io/downloads) >= 0.14.0
+The old setup was a single TF file. New version:
+- Split into proper modules (providers, compute, network, etc.)
+- Multi-node cluster instead of one VM
+- Actual networking (security groups, floating IPs)
+- Auto-generated Ansible inventory
+- Variables for everything (image, flavor, cluster name)
+
+---
+
+## Requirements
+
+- OpenStack (DevStack in my case)
+- Terraform >= 0.14.0
+- OpenStack credentials sourced
+- SSH keypair configured (`key_pair_name` variable)
+
+---
 
 ## Files
 
-- **local.conf** - DevStack configuration for manual OpenStack installation
-- **main.tf** - Terraform configuration for automated VM deployment
-- **first_pic.png** - OpenStack VM creation flow diagram
-- **second_pic.png** - OpenStack service architecture diagram
+**Week 1:**
+- `local.conf` / `local.conf.example` - DevStack config
+- `first_pic.png` / `second_pic.png` - Architecture diagrams
+
+**Week 2:**
+- `*.tf` files - Terraform infrastructure
+- `terraform.tfvars` - Config values
+- `ansible/` - K8s automation (WIP)
