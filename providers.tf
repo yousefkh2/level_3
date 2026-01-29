@@ -8,4 +8,12 @@ terraform {
   }
 }
 
-provider "openstack" {}
+provider "openstack" {
+  auth_url            = "http://10.0.0.8/identity"
+  region              = "RegionOne"
+  user_name           = "admin"
+  password            = "serr_1"
+  tenant_name         = "admin"
+  user_domain_id      = "default"
+  project_domain_id   = "default"
+}

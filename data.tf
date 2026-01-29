@@ -1,12 +1,11 @@
 
 
-data "openstack_images_image_v2" "debian12" {
-  name        = var.image_name
-  most_recent = true
+data "openstack_compute_flavor_v2" "medium" {
+  name = "m1.medium"
 }
 
-data "openstack_compute_flavor_v2" "medium" {
-  name = var.flavor_name
+data "openstack_compute_flavor_v2" "small" {
+  name = "m1.small"
 }
 
 data "openstack_networking_network_v2" "k8s_network" {

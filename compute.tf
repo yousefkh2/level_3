@@ -1,8 +1,8 @@
 locals {
   nodes = {
-    server = { name_suffix = "server" }
-    node-0 = { name_suffix = "node-0" }
-    node-1 = { name_suffix = "node-1" }
+    server = { name_suffix = "server", flavor = "medium" }
+    node-0 = { name_suffix = "node-0", flavor = "small" }
+    node-1 = { name_suffix = "node-1", flavor = "small" }
   }
 }
 
@@ -11,9 +11,9 @@ resource "openstack_compute_instance_v2" "k8s_nodes" {
 
   name      = "${var.cluster_name}-${each.value.name_suffix}"
   image_id  = data.openstack_images_image_v2.debian12.id
-  flavor_id = data.openstack_compute_flavor_v2.medium.id
+  flavor_id = each.value.flavor == "medium" ? data.openstack_compute_flavor_v2.medium.id : data.openstack_compute_flavor_v2.small.id
 
-  key_pair = var.key_pair_name
+  key_pair = openstack_compute_keypair_v2.k8s_keypair.name
 
   metadata = {
     role = each.key
