@@ -40,4 +40,7 @@ resource "openstack_networking_floatingip_associate_v2" "fip_assoc" {
   floating_ip = openstack_networking_floatingip_v2.fip[each.key].address
 
   port_id = openstack_networking_port_v2.k8s_ports[each.key].id
+  
+  # Ensure router is connected to subnet before associating floating IPs
+  depends_on = [openstack_networking_router_interface_v2.k8s_router_interface]
 }

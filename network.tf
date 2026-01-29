@@ -33,6 +33,21 @@ resource "openstack_networking_secgroup_rule_v2" "ssh_rule" {
   security_group_id = openstack_networking_secgroup_v2.k8s_ssh.id
 }
 
+# ROUTER - Connect shared network to public network for floating IPs
+data "openstack_networking_network_v2" "public" {
+  name = var.public_network_name
+}
+
+resource "openstack_networking_router_v2" "k8s_router" {
+  name                = "${var.cluster_name}-router"
+  external_network_id = data.openstack_networking_network_v2.public.id
+}
+
+resource "openstack_networking_router_interface_v2" "k8s_router_interface" {
+  router_id = openstack_networking_router_v2.k8s_router.id
+  subnet_id = tolist(data.openstack_networking_network_v2.k8s_network.subnets)[0]
+}
+
 
 resource "openstack_networking_port_v2" "k8s_ports" {
   for_each       = local.nodes
