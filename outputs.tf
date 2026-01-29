@@ -17,3 +17,14 @@ output "ssh_connection_command" {
   description = "Example SSH connection command"
   value       = "ssh -i ${local_file.private_key.filename} debian@<floating_ip>"
 }
+
+output "easy_ssh_commands" {
+  description = "Copy/Paste these commands to connect immediately"
+  value = {
+    for k, v in local.nodes : k => format(
+      "ssh -i ./%s-key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null debian@%s", 
+      var.cluster_name, 
+      openstack_networking_floatingip_v2.fip[k].address
+    )
+  }
+}
