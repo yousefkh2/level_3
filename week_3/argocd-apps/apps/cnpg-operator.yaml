@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cnpg-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"  # Install first
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/cloudnative-pg/cloudnative-pg
+    targetRevision: release-1.24
+    path: releases/cnpg-1.24.1.yaml
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
