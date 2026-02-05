@@ -4,7 +4,7 @@ metadata:
   name: cnpg-operator
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"  # Install first
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
@@ -21,3 +21,10 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+  # Ignore the poolers CRD from tracking
+  ignoreDifferences:
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+    name: poolers.postgresql.cnpg.io
+    jsonPointers:
+    - /metadata/annotations
