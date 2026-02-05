@@ -8,11 +8,12 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/cloudnative-pg/cloudnative-pg
-    targetRevision: release-1.24
-    path: releases/cnpg-1.24.1.yaml
+    repoURL: https://cloudnative-pg.github.io/charts
+    chart: cloudnative-pg
+    targetRevision: 0.22.1
   destination:
     server: https://kubernetes.default.svc
+    namespace: cnpg-system
   syncPolicy:
     automated:
       prune: true
