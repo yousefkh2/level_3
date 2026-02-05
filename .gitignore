@@ -20,3 +20,8 @@ terraform.tfstate.*
 .DS_Store
 Thumbs.db
 *.pem
+
+
+
+key.json
+cl-q801m3if.yml
