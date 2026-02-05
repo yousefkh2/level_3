@@ -20,11 +20,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true
-  # Ignore the poolers CRD from tracking
-  ignoreDifferences:
-  - group: apiextensions.k8s.io
-    kind: CustomResourceDefinition
-    name: poolers.postgresql.cnpg.io
-    jsonPointers:
-    - /metadata/annotations
+      - Replace=true  # Use replace instead of apply - avoids annotation size issues
