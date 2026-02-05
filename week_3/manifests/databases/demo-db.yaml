@@ -4,6 +4,6 @@ metadata:
   name: demo-db
   namespace: default
 spec:
-  instances: 3
+  instances: 5
   storage:
     size: 1Gi
