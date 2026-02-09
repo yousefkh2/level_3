@@ -3,9 +3,8 @@
 package services
 
 import (
-	"context"                                                 // timer for the request. if the API takes too long, ctx tells it to give up
-	cnpgv1 "github.come/cloudnative-pg/cloudnative-pg/api/v1" //this is cnpg specific stuff
-	"k8s.io/apimachinery/pkg/api/resource"
+	"context"                                                // timer for the request. if the API takes too long, ctx tells it to give up
+	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1" //this is cnpg specific stuff
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -14,8 +13,8 @@ type DatabaseService struct {
 	K8sClient client.Client // controller-runtime client (instead of kubectl)
 }
 
-func NewDatabaseService() *DatabaseService {
-	return &DatabaseService{k8sClient: k8sClient}
+func NewDatabaseService(k8sClient client.Client) *DatabaseService {
+	return &DatabaseService{K8sClient: k8sClient}
 }
 
 func (s *DatabaseService) CreateDatabase(ctx context.Context, name string, instances int, storage string) (*cnpgv1.Cluster, error) {

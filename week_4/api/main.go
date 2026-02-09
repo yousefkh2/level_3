@@ -1,17 +1,16 @@
 package main
 
 import (
+	"log"
+
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/yousefkh2/level_3/week_4/api/app"
 	"github.com/yousefkh2/level_3/week_4/api/config"
-	"log"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-)
+	"github.com/yousefkh2/level_3/week_4/api/services"
+	"github.com/yousefkh2/level_3/week_4/api/handlers"
 
-type App struct {
-	K8sClient client.Client // controller-runtime client (not Clientset)
-	// Later: database connections, config, etc.
-}
+)
 
 func main() {
 	k8sClient, err := config.NewKubernetesClient()
@@ -19,8 +18,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	app := &App{
+	app := &app.App{
 		K8sClient: k8sClient,
+		DBService: services.NewDatabaseService(k8sClient),
 	}
 
 	_ = app
@@ -50,6 +50,8 @@ func main() {
 	e.GET("/health", func(c echo.Context) error {
 		return c.JSON(200, map[string]string{"status": "ok"})
 	})
+
+	e.POST("/databases", handlers.CreateDatabase)
 
 	e.Logger.Fatal(e.Start(":8080"))
 }

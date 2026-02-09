@@ -3,7 +3,7 @@ package models
 import "time"
 
 type CreateDatabaseRequest struct {
-	ID        string `json:"id"`
+	Name      string `json:"name"`
 	Instances int    `json:"instances"`
 	Storage   string `json:"storage"`
 }
@@ -14,7 +14,7 @@ type DatabaseSpec struct {
 }
 
 type DatabaseResponse struct {
-	ID        string       `json:"id"`
+	Name      string       `json:"name"`
 	Spec      DatabaseSpec `json:"spec"`
 	Status    string       `json:"status"`
 	CreatedAt time.Time    `json:"createdAt"`
