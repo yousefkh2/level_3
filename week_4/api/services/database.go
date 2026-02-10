@@ -39,3 +39,40 @@ func (s *DatabaseService) CreateDatabase(ctx context.Context, name string, insta
 
 	return cluster, nil
 }
+
+func (s *DatabaseService) ListDatabases(ctx context.Context) ([]cnpgv1.Cluster, error) {
+	var clusterList cnpgv1.ClusterList
+
+	err := s.K8sClient.List(ctx, &clusterList, client.InNamespace("default"))
+	if err != nil {
+		return nil, err
+	}
+
+	return clusterList.Items, nil
+}
+
+func (s *DatabaseService) GetDatabase(ctx context.Context, name string) (*cnpgv1.Cluster, error) {
+	var cluster cnpgv1.Cluster
+
+	err := s.K8sClient.Get(ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: "default",
+	}, &cluster)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &cluster, nil
+}
+
+func (s *DatabaseService) DeleteDatabase(ctx context.Context, name string) error {
+	cluster := &cnpgv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+		},
+	}
+
+	return s.K8sClient.Delete(ctx, cluster)
+}

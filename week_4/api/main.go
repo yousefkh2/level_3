@@ -7,9 +7,8 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/yousefkh2/level_3/week_4/api/app"
 	"github.com/yousefkh2/level_3/week_4/api/config"
-	"github.com/yousefkh2/level_3/week_4/api/services"
 	"github.com/yousefkh2/level_3/week_4/api/handlers"
-
+	"github.com/yousefkh2/level_3/week_4/api/services"
 )
 
 func main() {
@@ -52,6 +51,9 @@ func main() {
 	})
 
 	e.POST("/databases", handlers.CreateDatabase)
+	e.GET("/databases", handlers.ListDatabases)
 
+	e.GET("/databases/:name", handlers.GetDatabase)
+	e.DELETE("/databases/:name", handlers.DeleteDatabase)
 	e.Logger.Fatal(e.Start(":8080"))
 }
