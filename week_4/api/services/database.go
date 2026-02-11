@@ -10,7 +10,7 @@ import (
 )
 
 type DatabaseService struct {
-	K8sClient client.Client // controller-runtime client (instead of kubectl)
+	K8sClient client.Client // controller-runtime client (instead of clientSet)
 }
 
 func NewDatabaseService(k8sClient client.Client) *DatabaseService {
