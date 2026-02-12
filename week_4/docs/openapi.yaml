@@ -1,0 +1,231 @@
+openapi: 3.0.3
+info:
+  title: PaaS Database API
+  description: |
+    RESTful API for provisioning and managing CloudNativePG database instances
+    on the STACKIT Kubernetes Engine (SKE).
+  version: 1.0.0
+  contact:
+    name: Yousef Khattab
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags: [Health]
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /databases:
+    post:
+      summary: Create a database
+      operationId: createDatabase
+      tags: [Databases]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDatabaseRequest"
+      responses:
+        "201":
+          description: Database created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseResponse"
+        "400":
+          description: Invalid request body or database configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized (RBAC)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Database already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      summary: List all databases
+      operationId: listDatabases
+      tags: [Databases]
+      responses:
+        "200":
+          description: A list of databases (may be empty)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DatabaseResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /databases/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        description: Name of the database instance
+        schema:
+          type: string
+        example: my-db
+
+    get:
+      summary: Get database details
+      operationId: getDatabase
+      tags: [Databases]
+      responses:
+        "200":
+          description: Database details including connection info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseDetailResponse"
+        "404":
+          description: Database not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      summary: Delete a database
+      operationId: deleteDatabase
+      tags: [Databases]
+      responses:
+        "204":
+          description: Database deleted (or already gone — idempotent)
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    CreateDatabaseRequest:
+      type: object
+      required: [name, instances, storage]
+      properties:
+        name:
+          type: string
+          description: Name for the new database cluster
+          example: my-db
+        instances:
+          type: integer
+          description: Number of PostgreSQL instances (replicas)
+          example: 3
+        storage:
+          type: string
+          description: Storage size per instance (Kubernetes quantity)
+          example: 1Gi
+
+    DatabaseSpec:
+      type: object
+      properties:
+        instances:
+          type: integer
+          example: 3
+        storage:
+          type: string
+          example: 1Gi
+
+    DatabaseResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          example: my-db
+        spec:
+          $ref: "#/components/schemas/DatabaseSpec"
+        status:
+          type: string
+          description: Current phase of the cluster (e.g. "creating", "Cluster in healthy state")
+          example: creating
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-11T10:00:00Z"
+
+    DatabaseDetailResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          example: my-db
+        spec:
+          $ref: "#/components/schemas/DatabaseSpec"
+        status:
+          type: string
+          example: Cluster in healthy state
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-02-11T10:00:00Z"
+        connection:
+          $ref: "#/components/schemas/ConnectionInfo"
+
+    ConnectionInfo:
+      type: object
+      properties:
+        host:
+          type: string
+          description: In-cluster DNS name for the read-write service
+          example: my-db-rw.default.svc.cluster.local
+        port:
+          type: integer
+          example: 5432
+        database:
+          type: string
+          example: app
+        username:
+          type: string
+          example: app
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: database already exists
