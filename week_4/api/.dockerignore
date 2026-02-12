@@ -1,0 +1,24 @@
+# Test files
+*_test.go
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Kubernetes configs (not needed in container)
+*.yaml
+kubeconfig*
