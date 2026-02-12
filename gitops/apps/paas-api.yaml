@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: paas-api
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"  # install after operator
+  # finalizer ensures resources are cleaned up properly on deletion
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/yousefkh2/level_3
+    targetRevision: main
+    path: week_4/manifests
+  destination:
+    server: https://kubernetes.default.svc # api server of the cluster we are currently inside
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true  # auto-create paas-control-plane namespace
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # allow manual scaling for testing
