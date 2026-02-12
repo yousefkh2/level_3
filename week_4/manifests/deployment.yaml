@@ -1,0 +1,108 @@
+#the pod with very specific superpowers
+# section 5 is the deployment, where we specify one pod
+# sections 2,3, and 4 create the IAM layer
+
+
+# 1. NAMESPACE - isolate control plane resources
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: paas-control-plane
+---
+# 2. THE IDENTITY (ServiceAccount)
+# to give our API the identity card
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: paas-api-sa
+  namespace: paas-control-plane
+---
+# 3. THE POWER (Role)
+# grants the API full CRUD permissions over PostgreSQL Custom Resources cluster-wide
+# It needs to manage "clusters" (the PostgreSQL ones)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole # not Role (to work across all namespaces; dbs are in 'default' namespace)
+metadata:
+  name: cluster-manager-role
+rules:
+- apiGroups: ["postgresql.cnpg.io"]
+  resources: ["clusters"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+# 4. CLUSTER ROLE BINDING
+# This attaches the Power (Role) to the Identity (ServiceAccount)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: paas-api-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: paas-api-sa
+  namespace: paas-control-plane
+roleRef:
+  kind: ClusterRole
+  name: cluster-manager-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# 5. THE BODY (Deployment)
+# This is where your pushed image actually runs
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paas-api
+  namespace: paas-control-plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "paas-api"
+  template:
+    metadata:
+      labels:
+        app: "paas-api"
+    spec:
+      serviceAccountName: paas-api-sa
+      imagePullSecrets:
+      - name: stackit-registry-key
+      containers:
+      - name: api
+        image: registry.onstackit.cloud/level-3-paas/paas-api:v1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        livenessProbe: # liveness and readiness probes are much more powerful than the dockerfile's HEALTHCHECK
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe: #
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 2
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+---
+# 6. add a clusterIP service to reach it from inside the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: paas-api-service
+  namespace: paas-control-plane
+spec:
+  selector:
+    app: paas-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: http
+      name: http
+  type: ClusterIP
