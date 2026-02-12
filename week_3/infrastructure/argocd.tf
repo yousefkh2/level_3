@@ -43,7 +43,7 @@ resource "time_sleep" "after_crd" {
 
 # Apply the root app
 # resource "kubernetes_manifest" "argocd_root_app" {
-#   manifest = yamldecode(file("${path.module}/../argocd-apps/root-app.yaml"))
+#   manifest = yamldecode(file("${path.module}/../../gitops/root-app.yaml"))
   
 #   depends_on = [time_sleep.after_crd]
 # }
@@ -53,13 +53,13 @@ resource "null_resource" "apply_argocd_root_app" {
 
   triggers = {
     # This ensures the command runs again if the file changes
-    manifest_sha1 = filesha1("${path.module}/../argocd-apps/root-app.yaml")
+    manifest_sha1 = filesha1("${path.module}/../../gitops/root-app.yaml")
   }
 
   provisioner "local-exec" {
     command = <<EOT
       KUBECONFIG=${local_file.kubeconfig.filename} \
-      kubectl apply -f ${path.module}/../argocd-apps/root-app.yaml
+      kubectl apply -f ${path.module}/../../gitops/root-app.yaml
     EOT
   }
 }

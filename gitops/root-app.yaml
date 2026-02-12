@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/yousefkh2/level_3
     targetRevision: main
-    path: week_3/argocd-apps/apps
+    path: gitops/apps
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

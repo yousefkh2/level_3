@@ -71,7 +71,7 @@ week_3/
 │   ├── main.tf
 │   ├── terraform.tfvars
 │   └── terraform.tfstate
-├── manifests/                   # Kubernetes manifests (GitOps watches here)
+├── manifests/                   # Kubernetes manifests
 │   └── databases/               # Database cluster definitions
 │       └── first-db.yaml
 ├── docs/                        # Documentation
@@ -82,6 +82,8 @@ week_3/
 │   └── week3-architecture.svg   # Architecture diagram
 └── scripts/                     # Helper scripts
     └── week3-demo.sh            # Lifecycle demonstration
+
+# Note: ArgoCD GitOps apps moved to top-level gitops/ directory
 ```
 
 ## Quick Start

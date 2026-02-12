@@ -19,14 +19,23 @@ terraform {
   }
 }
 
+
 provider "stackit" {
-  default_region                   = "eu01"
-  service_account_key_path = "${path.module}/../../sa-key-2fed783a-c9ca-4e49-870b-b65b36e5e728.json"
+  default_region           = "eu01"
+  # Locally: uses the key file
+  # CI: set STACKIT_SERVICE_ACCOUNT_KEY_PATH or STACKIT_SERVICE_ACCOUNT_TOKEN env var
+  service_account_key_path = var.service_account_key_path
 }
 
 variable "project_id" {
   type        = string
   description = "STACKIT Project ID"
+}
+
+variable "service_account_key_path" {
+  type        = string
+  description = "Path to the STACKIT service account key JSON file"
+  default     = "../../sa-key-2fed783a-c9ca-4e49-870b-b65b36e5e728.json"
 }
 
 variable "cluster_name" {
@@ -64,7 +73,7 @@ resource "stackit_ske_cluster" "this" {
 # 1. Generate the Kubeconfig
 resource "stackit_ske_kubeconfig" "this" {
   project_id   = var.project_id
-  cluster_name = stackit_ske_cluster.this.name
+  cluster_name = stackit_ske_cluster.this.name // key for implicit dependency. it waits for it to be there 
   
   # Optional: Set expiration (defaults to 1h if unset)
   # refresh = true ensures TF updates it if it expires

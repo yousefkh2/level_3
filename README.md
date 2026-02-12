@@ -13,13 +13,19 @@ This project demonstrates building a complete cloud platform stack end-to-end: s
 ```
 cloud/
 ├── README.md               # This file
+├── gitops/                # ArgoCD app-of-apps (shared across weeks)
+│   ├── root-app.yaml      # Root Application
+│   └── apps/              # Child Application CRs
 ├── week_1_2/              # Week 1-2: OpenStack + K8s
 ├── week_3/                # Week 3: PaaS Product - Managed Database
 │   ├── infrastructure/    # SKE cluster (Terraform)
-│   ├── manifests/         # K8s resources (GitOps watches)
+│   ├── manifests/         # K8s resources (databases)
 │   ├── docs/              # Documentation
 │   └── scripts/           # Demo & validation scripts
-├── week_4/                # Week 4: REST API (Coming soon)
+├── week_4/                # Week 4: REST API
+│   ├── api/               # Go API source code
+│   ├── manifests/         # K8s deployment (Kustomize)
+│   └── docs/              # OpenAPI spec, diagrams
 ├── week_5/                # Week 5: Web UI & Ingress (Coming soon)
 └── week_6/                # Week 6: Observability (Coming soon)
 ```
