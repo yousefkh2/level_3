@@ -283,3 +283,187 @@ func TestListDatabases(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDatabase(t *testing.T) {
+	tests := []struct {
+		name       string
+		paramName  string // URL param :name
+		getFunc    func(ctx context.Context, name string) (*cnpgv1.Cluster, error)
+		wantStatus int
+		wantErrKey string                         // if non-empty, expect error response
+		wantResp   *models.DatabaseDetailResponse // if non-nil, check fields
+	}{
+		{
+			name:      "Success",
+			paramName: "my-db",
+			getFunc: func(ctx context.Context, name string) (*cnpgv1.Cluster, error) {
+				return &cnpgv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{Name: name},
+					Spec: cnpgv1.ClusterSpec{
+						Instances:            3,
+						StorageConfiguration: cnpgv1.StorageConfiguration{Size: "1Gi"},
+					},
+				}, nil
+			},
+			wantStatus: http.StatusOK,
+			wantResp: &models.DatabaseDetailResponse{
+				Name: "my-db",
+				Spec: models.DatabaseSpec{Instances: 3, Storage: "1Gi"},
+				Connection: models.ConnectionInfo{
+					Host:     "my-db-rw.default.svc.cluster.local",
+					Port:     5432,
+					Database: "app",
+					Username: "app",
+				},
+			},
+		},
+		{
+			name:      "NotFound",
+			paramName: "ghost-db",
+			getFunc: func(ctx context.Context, name string) (*cnpgv1.Cluster, error) {
+				return nil, apierrors.NewNotFound(
+					schema.GroupResource{Group: "postgresql.cnpg.io", Resource: "clusters"}, name,
+				)
+			},
+			wantStatus: http.StatusNotFound,
+			wantErrKey: "error",
+		},
+		{
+			name:      "InternalServerError",
+			paramName: "fail-db",
+			getFunc: func(ctx context.Context, name string) (*cnpgv1.Cluster, error) {
+				return nil, fmt.Errorf("k8s blew up")
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantErrKey: "error",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, "/databases/"+tc.paramName, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			// set the :name URL param so c.Param("name") works inside the handler
+			c.SetParamNames("name")
+			c.SetParamValues(tc.paramName)
+
+			c.Set("app", &app.App{
+				DBService: &MockDatabaseService{GetFunc: tc.getFunc},
+			})
+
+			err := GetDatabase(c)
+			if err != nil {
+				t.Fatalf("expected no error from handler, got %v", err)
+			}
+
+			if rec.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d", rec.Code, tc.wantStatus)
+			}
+
+			if tc.wantResp != nil {
+				var got models.DatabaseDetailResponse
+				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+					t.Fatalf("failed to parse response: %v", err)
+				}
+				if got.Name != tc.wantResp.Name {
+					t.Errorf("name = %q, want %q", got.Name, tc.wantResp.Name)
+				}
+				if got.Spec.Instances != tc.wantResp.Spec.Instances {
+					t.Errorf("instances = %d, want %d", got.Spec.Instances, tc.wantResp.Spec.Instances)
+				}
+				if got.Spec.Storage != tc.wantResp.Spec.Storage {
+					t.Errorf("storage = %q, want %q", got.Spec.Storage, tc.wantResp.Spec.Storage)
+				}
+				if got.Connection.Host != tc.wantResp.Connection.Host {
+					t.Errorf("host = %q, want %q", got.Connection.Host, tc.wantResp.Connection.Host)
+				}
+				if got.Connection.Port != tc.wantResp.Connection.Port {
+					t.Errorf("port = %d, want %d", got.Connection.Port, tc.wantResp.Connection.Port)
+				}
+			}
+			if tc.wantErrKey != "" {
+				var got map[string]string
+				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+					t.Fatalf("failed to parse error response: %v", err)
+				}
+				if got[tc.wantErrKey] == "" {
+					t.Errorf("expected %q key in response, got %v", tc.wantErrKey, got)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteDatabase(t *testing.T) {
+	tests := []struct {
+		name       string
+		paramName  string // URL param :name
+		deleteFunc func(ctx context.Context, name string) error
+		wantStatus int
+		wantErrKey string // if non-empty, expect JSON error body
+	}{
+		{
+			name:      "Success",
+			paramName: "my-db",
+			deleteFunc: func(ctx context.Context, name string) error {
+				return nil
+			},
+			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:      "NotFound_Idempotent",
+			paramName: "gone-db",
+			deleteFunc: func(ctx context.Context, name string) error {
+				return apierrors.NewNotFound(
+					schema.GroupResource{Group: "postgresql.cnpg.io", Resource: "clusters"}, name,
+				)
+			},
+			wantStatus: http.StatusNoContent, // idempotent - already gone
+		},
+		{
+			name:      "InternalServerError",
+			paramName: "fail-db",
+			deleteFunc: func(ctx context.Context, name string) error {
+				return fmt.Errorf("something broke")
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantErrKey: "error",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodDelete, "/databases/"+tc.paramName, nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.SetParamNames("name")
+			c.SetParamValues(tc.paramName)
+
+			c.Set("app", &app.App{
+				DBService: &MockDatabaseService{DeleteFunc: tc.deleteFunc},
+			})
+
+			err := DeleteDatabase(c)
+			if err != nil {
+				t.Fatalf("expected no error from handler, got %v", err)
+			}
+
+			if rec.Code != tc.wantStatus {
+				t.Errorf("status = %d, want %d", rec.Code, tc.wantStatus)
+			}
+
+			if tc.wantErrKey != "" {
+				var got map[string]string
+				if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+					t.Fatalf("failed to parse error response: %v", err)
+				}
+				if got[tc.wantErrKey] == "" {
+					t.Errorf("expected %q key in response, got %v", tc.wantErrKey, got)
+				}
+			}
+		})
+	}
+}
