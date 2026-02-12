@@ -7,6 +7,7 @@ namespace: paas-control-plane
 
 resources:
   - deployment.yaml
+  - hpa.yaml
 
 # Common labels applied to all resources
 commonLabels:

@@ -1,0 +1,35 @@
+# hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: paas-api-hpa
+  namespace: paas-control-plane
+spec:
+  scaleTargetRef: # most important part (which depl. to watch)
+    apiVersion: apps/v1
+    kind: Deployment
+    name: paas-api
+  minReplicas: 1
+  maxReplicas: 5
+  metrics: # defining the average state of the pods
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 10 # very low for testing
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70 # same here
+  behavior: # optional section
+    scaleUp:
+      stabilizationWindowSeconds: 30    # react quickly for testing (I've been hot for 30 seconds, let's add pods now!)
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 120   # don't scale down too aggressively
