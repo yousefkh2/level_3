@@ -12,6 +12,7 @@ type DatabaseService interface {
 	ListDatabases(ctx context.Context) ([]cnpgv1.Cluster, error)
 	GetDatabase(ctx context.Context, name string) (*cnpgv1.Cluster, error)
 	DeleteDatabase(ctx context.Context, name string) error
+	UpdateDatabase(ctx context.Context, name string, instances *int, storage *string) (*cnpgv1.Cluster, error)
 }
 
 type App struct {

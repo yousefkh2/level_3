@@ -18,7 +18,7 @@ func NewDatabaseService(k8sClient client.Client) *DatabaseService {
 }
 
 func (s *DatabaseService) CreateDatabase(ctx context.Context, name string, instances int, storage string) (*cnpgv1.Cluster, error) {
-	cluster := &cnpgv1.Cluster{ // now we initialize the object... this is the empty form we are filling
+	cluster := &cnpgv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
@@ -31,7 +31,6 @@ func (s *DatabaseService) CreateDatabase(ctx context.Context, name string, insta
 		},
 	}
 
-	//  this is the magic line - creates it in kubernetes
 	err := s.K8sClient.Create(ctx, cluster)
 	if err != nil {
 		return nil, err
@@ -75,4 +74,34 @@ func (s *DatabaseService) DeleteDatabase(ctx context.Context, name string) error
 	}
 
 	return s.K8sClient.Delete(ctx, cluster)
+}
+
+func (s *DatabaseService) UpdateDatabase(ctx context.Context, name string, instances *int, storage *string) (*cnpgv1.Cluster, error) {
+	var cluster cnpgv1.Cluster
+	err := s.K8sClient.Get(ctx, client.ObjectKey{
+		Name:      name,
+		Namespace: "default",
+	}, &cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	// create a patch base (snapshot of current state)
+	patch := client.MergeFrom(cluster.DeepCopy())
+
+	// mutate only the fields that were provided
+	if instances != nil {
+		cluster.Spec.Instances = *instances
+	}
+	if storage != nil {
+		cluster.Spec.StorageConfiguration.Size = *storage
+	}
+
+	// apply the patch (sends only the diff to k8s)
+	err = s.K8sClient.Patch(ctx, &cluster, patch) // patch (old); cluster (new)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cluster, nil
 }

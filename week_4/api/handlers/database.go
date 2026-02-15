@@ -133,3 +133,42 @@ func DeleteDatabase(c echo.Context) error {
 	}
 	return c.NoContent(http.StatusNoContent)
 }
+
+func UpdateDatabase(c echo.Context) error {
+	appCtx := c.Get("app").(*app.App)
+	name := c.Param("name")
+
+	var req models.UpdateDatabaseRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request"})
+	}
+
+	// at least one field must be provided
+	if req.Instances == nil && req.Storage == nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "no fields to update"})
+	}
+
+	// call the service
+	cluster, err := appCtx.DBService.UpdateDatabase(c.Request().Context(), name, req.Instances, req.Storage)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "database not found"})
+		}
+		if errors.IsInvalid(err) {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		}
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	response := models.DatabaseResponse{
+		Name: cluster.Name,
+		Spec: models.DatabaseSpec{
+			Instances: cluster.Spec.Instances,
+			Storage:   cluster.Spec.StorageConfiguration.Size,
+		},
+		Status:    string(cluster.Status.Phase),
+		CreatedAt: cluster.CreationTimestamp.Time,
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
