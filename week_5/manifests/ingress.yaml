@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: paas-ingress-api
+  namespace: paas-control-plane
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - paas.null.stackit.run
+    secretName: paas-tls-cert
+  rules:
+  - host: paas.null.stackit.run
+    http:
+      paths:
+      - path: /api(/|$)(.*) # capture everything after /api and /$2
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: paas-api-service
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: paas-ingress-ui
+  namespace: paas-control-plane
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - paas.null.stackit.run
+    secretName: paas-tls-cert
+  rules:
+  - host: paas.null.stackit.run
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: paas-ui
+            port:
+              number: 80

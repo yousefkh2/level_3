@@ -25,7 +25,7 @@ type DatabaseDetailResponse struct {
 	Spec       DatabaseSpec   `json:"spec"`
 	Status     string         `json:"status"`
 	CreatedAt  time.Time      `json:"created_at"`
-	Connection ConnectionInfo `json:"connection"` // NEW
+	Connection ConnectionInfo `json:"connection"`
 }
 
 type ConnectionInfo struct {
@@ -33,4 +33,18 @@ type ConnectionInfo struct {
 	Port     int    `json:"port"`
 	Database string `json:"database"`
 	Username string `json:"username"`
+}
+
+type UpdateDatabaseRequest struct {
+	Instances *int    `json:"instances,omitempty"`
+	Storage   *string `json:"storage,omitempty"`
+}
+
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
 }

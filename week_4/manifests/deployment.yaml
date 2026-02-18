@@ -52,6 +52,13 @@ spec:
         ports:
         - containerPort: 8080
           name: http
+        env:
+        - name: API_USERNAME
+          value: "admin"
+        - name: API_PASSWORD
+          value: "secret123"
+        - name: JWT_SECRET
+          value: "my-secret-key"
         livenessProbe:
           httpGet:
             path: /health

@@ -8,6 +8,7 @@ import (
 	"github.com/yousefkh2/level_3/week_4/api/app"
 	"github.com/yousefkh2/level_3/week_4/api/config"
 	"github.com/yousefkh2/level_3/week_4/api/handlers"
+	mw "github.com/yousefkh2/level_3/week_4/api/middleware"
 	"github.com/yousefkh2/level_3/week_4/api/services"
 )
 
@@ -22,7 +23,6 @@ func main() {
 		DBService: services.NewDatabaseService(k8sClient),
 	}
 
-	_ = app
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
@@ -49,16 +49,18 @@ func main() {
 		}
 	})
 
-	// routes will go here
-
 	e.GET("/health", func(c echo.Context) error {
 		return c.JSON(200, map[string]string{"status": "ok"})
 	})
 
-	e.POST("/databases", handlers.CreateDatabase)
-	e.GET("/databases", handlers.ListDatabases)
+	e.POST("/auth/login", handlers.Login)
 
-	e.GET("/databases/:name", handlers.GetDatabase)
-	e.DELETE("/databases/:name", handlers.DeleteDatabase)
+	// now these routes are protected
+	e.POST("/databases", handlers.CreateDatabase, mw.JWTAuth)
+	e.GET("/databases", handlers.ListDatabases, mw.JWTAuth)
+
+	e.GET("/databases/:name", handlers.GetDatabase, mw.JWTAuth)
+	e.PATCH("/databases/:name", handlers.UpdateDatabase, mw.JWTAuth)
+	e.DELETE("/databases/:name", handlers.DeleteDatabase, mw.JWTAuth)
 	e.Logger.Fatal(e.Start(":8080"))
 }
