@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+
+namespace: paas-control-plane
+
+
+resources:
+  - ui-deployment.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: paas-ui
+  app.kubernetes.io/component: control-plane
+  app.kubernetes.io/part-of: paas-platform
+  app.kubernetes.io/managed-by: argocd
+
+commonAnnotations:
+  managed-by: "ArgoCD"
+  week: "5"
+
+images:
+  - name: registry.onstackit.cloud/level-3-paas/paas-ui
+    newTag: latest

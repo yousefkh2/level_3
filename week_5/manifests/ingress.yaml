@@ -24,8 +24,8 @@ spec:
             name: paas-api-service
             port:
               number: 80
-      - path: /
-        pathType: Prefix
+      - path: /()(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: paas-ui
