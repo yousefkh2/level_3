@@ -1,10 +1,11 @@
 <script setup>
 import { RouterLink, RouterView, useRouter } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { ref, onBeforeUnmount, onMounted } from 'vue'
 import { getToken, clearToken } from '@/services/api'
 
 const router = useRouter()
 const isLoggedIn = ref(false)
+let removeAfterEachHook = null
 
 const checkAuth = () => {
   isLoggedIn.value = !!getToken()
@@ -18,95 +19,135 @@ const logout = () => {
 
 onMounted(() => {
   checkAuth()
-  // Re-check auth on route changes
-  router.afterEach(() => {
+  removeAfterEachHook = router.afterEach(() => {
     checkAuth()
   })
+})
+
+onBeforeUnmount(() => {
+  if (typeof removeAfterEachHook === 'function') {
+    removeAfterEachHook()
+  }
 })
 </script>
 
 <template>
-  <header>
-    <nav>
-      <RouterLink v-if="!isLoggedIn" to="/login">Login</RouterLink>
-      <RouterLink v-if="isLoggedIn" to="/databases">Databases</RouterLink>
-      <a v-if="isLoggedIn" @click="logout" class="logout-btn">Logout</a>
-    </nav>
-  </header>
+  <div class="app-shell">
+    <header class="top-bar">
+      <div class="container top-bar__inner">
+        <RouterLink class="brand" to="/databases">
+          <span class="brand__dot" />
+          <span class="brand__name">PaaS Control Plane</span>
+        </RouterLink>
 
-  <RouterView />
+        <nav class="top-nav" aria-label="Primary">
+          <RouterLink v-if="!isLoggedIn" class="nav-link" to="/login">Login</RouterLink>
+          <RouterLink v-if="isLoggedIn" class="nav-link" to="/databases">Databases</RouterLink>
+          <button v-if="isLoggedIn" type="button" class="ghost-button" @click="logout">Logout</button>
+        </nav>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="container">
+        <RouterView v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
+      </div>
+    </main>
+  </div>
 </template>
 
 <style scoped>
-header {
-  line-height: 1.5;
-  max-height: 100vh;
+.app-shell {
+  min-height: 100vh;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+  background: rgb(243 245 248 / 80%);
+  border-bottom: 1px solid var(--color-border);
 }
 
-nav {
-  width: 100%;
-  font-size: 12px;
-  text-align: center;
-  margin-top: 2rem;
+.top-bar__inner {
+  min-height: 72px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
 }
 
-nav a.router-link-exact-active {
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-strong);
+}
+
+.brand__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #33a0ff, var(--color-primary));
+  box-shadow: 0 0 0 6px rgb(15 131 253 / 14%);
+}
+
+.brand__name {
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+}
+
+.top-nav {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.nav-link,
+.ghost-button {
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-label);
+  font-weight: 560;
   color: var(--color-text);
+  padding: 8px 14px;
+  background: transparent;
+  transition: all 180ms ease;
 }
 
-nav a.router-link-exact-active:hover {
-  background-color: transparent;
+.nav-link:hover,
+.ghost-button:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface);
 }
 
-nav a {
-  display: inline-block;
-  padding: 0 1rem;
-  border-left: 1px solid var(--color-border);
+.nav-link.router-link-exact-active {
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
+.ghost-button {
   cursor: pointer;
 }
 
-nav a:first-of-type {
-  border: 0;
+.main-content {
+  padding-block: var(--space-7) var(--space-8);
 }
 
-nav a.logout-btn {
-  color: #dc2626;
-  font-weight: 500;
-}
-
-nav a.logout-btn:hover {
-  color: #991b1b;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
+@media (max-width: 640px) {
+  .top-bar__inner {
+    min-height: 64px;
   }
 
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  nav {
-    text-align: left;
-    margin-left: -1rem;
-    font-size: 1rem;
-
-    padding: 1rem 0;
-    margin-top: 1rem;
+  .brand__name {
+    font-size: 14px;
   }
 }
 </style>
