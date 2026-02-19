@@ -17,7 +17,8 @@ spec:
       - name: stackit-registry-key
       containers:
       - name: ui
-        image: registry.onstackit.cloud/level-3-paas/paas-ui:latest
+        image: registry.onstackit.cloud/level-3-paas/paas-ui
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
 ---
