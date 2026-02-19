@@ -9,11 +9,13 @@ resources:
   - ui-deployment.yaml
   - ingress.yaml
 
-commonLabels:
-  app.kubernetes.io/name: paas-ui
-  app.kubernetes.io/component: control-plane
-  app.kubernetes.io/part-of: paas-platform
-  app.kubernetes.io/managed-by: argocd
+labels:
+  - pairs:
+      app.kubernetes.io/name: paas-ui
+      app.kubernetes.io/component: control-plane
+      app.kubernetes.io/part-of: paas-platform
+      app.kubernetes.io/managed-by: argocd
+    includeSelectors: false  # don't mutate immutable spec.selector
 
 commonAnnotations:
   managed-by: "ArgoCD"
