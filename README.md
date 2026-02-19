@@ -1,120 +1,130 @@
 # Building a Cloud-Native Platform: From IaaS to PaaS
 
-**A complete 6-week journey building a production-grade Platform-as-a-Service on Kubernetes**
+A 6-week build of a managed PostgreSQL Platform-as-a-Service on Kubernetes, starting from OpenStack infrastructure and moving up to API, UI, and GitOps operations.
 
-## Project Overview
-
-This project demonstrates building a complete cloud platform stack end-to-end: starting from raw infrastructure with OpenStack, moving through Kubernetes, and ending with a production-grade PaaS product featuring APIs, UI, automation, and observability.
-
-**Final Outcome**: A fully functional managed database PaaS on Kubernetes (SKE), complete with REST API, Web UI, GitOps automation, and full observability.
-
-## Project Structure
-
-```
-cloud/
-├── README.md               # This file
-├── gitops/                # ArgoCD app-of-apps (shared across weeks)
-│   ├── root-app.yaml      # Root Application
-│   └── apps/              # Child Application CRs
-├── week_1_2/              # Week 1-2: OpenStack + K8s
-├── week_3/                # Week 3: PaaS Product - Managed Database
-│   ├── infrastructure/    # SKE cluster (Terraform)
-│   ├── manifests/         # K8s resources (databases)
-│   ├── docs/              # Documentation
-│   └── scripts/           # Demo & validation scripts
-├── week_4/                # Week 4: REST API
-│   ├── api/               # Go API source code
-│   ├── manifests/         # K8s deployment (Kustomize)
-│   └── docs/              # OpenAPI spec, diagrams
-├── week_5/                # Week 5: Web UI & Ingress (Coming soon)
-└── week_6/                # Week 6: Observability (Coming soon)
-```
-
-## Progress
+## Current Status (February 2026)
 
 | Week | Topic | Status |
 |------|-------|--------|
-| 1 | IaaS with OpenStack | ✅ Complete |
-| 2 | K8s on OpenStack (Terraform) | ✅ Complete |
-| 3 | PaaS Product (Managed DB) | ✅ Core Complete, ⏳ Bonus |
-| 4 | REST API | 📋 Planned |
-| 5 | Web UI & Ingress | 📋 Planned |
-| 6 | Observability | 📋 Planned |
+| 1 | IaaS with OpenStack (DevStack) | Complete |
+| 2 | Kubernetes foundation on OpenStack (Terraform) | Complete |
+| 3 | Managed PostgreSQL PaaS (CloudNativePG) | Complete |
+| 4 | REST API control plane (Go + Echo + OpenAPI) | Complete |
+| 5 | Web UI + Ingress + TLS integration | In Progress (near completion) |
+| 6 | Observability (Prometheus/Grafana/Loki) | Not started |
 
-## Week Summaries
+## What Is Implemented Today
+
+### Platform Capabilities
+- Managed PostgreSQL provisioning on SKE via CloudNativePG CRs.
+- REST API for create/list/get/update/delete database instances.
+- JWT-based API auth (`/auth/login`) for protected database operations.
+- Vue 3 web UI for login and database lifecycle actions.
+- NGINX ingress routing:
+  - `/api` -> PaaS API service
+  - `/` -> PaaS UI service
+- GitOps automation with Argo CD app-of-apps and sync waves.
+
+### GitOps Sync Order
+The repo currently defines child apps in `gitops/apps/` with sync waves:
+1. `cnpg-operator` (wave 1)
+2. `databases` (wave 2)
+3. `paas-api` (wave 3)
+4. `paas-ui` (wave 4)
+
+Root app: `gitops/root-app.yaml`
+
+## Repository Structure
+
+```text
+cloud/
+├── README.md
+├── gitops/
+│   ├── root-app.yaml
+│   └── apps/
+│       ├── cnpg-operator.yaml
+│       ├── databases.yaml
+│       ├── paas-api.yaml
+│       └── paas-ui.yaml
+├── week_1_2/                  # OpenStack + Kubernetes foundation
+├── week_3/                    # Managed PostgreSQL product on SKE
+│   ├── infrastructure/        # Terraform for SKE + base setup
+│   ├── manifests/             # Database CR manifests
+│   ├── docs/
+│   └── scripts/
+├── week_4/                    # API control plane
+│   ├── api/                   # Go API code (Echo, JWT, handlers, tests)
+│   ├── manifests/             # Kustomize, deployment, RBAC, HPA
+│   └── docs/                  # OpenAPI + architecture
+├── week_5/                    # UI + ingress layer
+│   ├── ui/                    # Vue 3 + Vite frontend
+│   ├── manifests/             # UI deployment + ingress (kustomize)
+│   └── cluster-issuer.yaml    # cert-manager ClusterIssuer manifest
+└── week_6/                    # Observability (planned)
+```
+
+## Week Highlights
 
 ### Week 1-2: Infrastructure Foundation
-- OpenStack deployment with DevStack
-- Kubernetes cluster provisioning with Terraform
-- Location: [`week_1_2/`](week_1_2/)
+- DevStack/OpenStack setup.
+- Terraform-based VM/network provisioning for Kubernetes groundwork.
+- Main reference: `week_1_2/README.md`
 
-### Week 3: PaaS Product - Managed PostgreSQL ✅
-**What was built:**
-- SKE cluster on STACKIT Cloud
-- CloudNativePG operator deployment
-- Managed database provisioning via Custom Resources
-- Complete documentation and lifecycle demonstration
+### Week 3: Managed Database Product
+- CloudNativePG operator + PostgreSQL cluster provisioning via CRs.
+- Lifecycle demonstration and product documentation.
+- Main reference: `week_3/README.md`
 
-**Key deliverables:**
-- Working managed database service
-- Self-healing & auto-scaling capabilities
-- Full lifecycle demo script
-- Comprehensive documentation
+### Week 4: API Control Plane
+- Go/Echo API with health + auth + CRUD endpoints:
+  - `GET /health`
+  - `POST /auth/login`
+  - `POST /databases`
+  - `GET /databases`
+  - `GET /databases/:name`
+  - `PATCH /databases/:name`
+  - `DELETE /databases/:name`
+- RBAC + service account model for managing CNPG `Cluster` resources.
+- Containerized deployment and Kustomize overlays in `week_4/manifests/`.
+- Main reference: `week_4/README.md`
 
-📁 [Week 3 Details](week_3/README.md)
+### Week 5: UI, Ingress, TLS
+- Vue UI for login and database operations.
+- API integration through `VITE_API_URL` (production uses `/api`).
+- Ingress routes UI and API behind one host (`paas.null.stackit.run`).
+- TLS setup prepared with cert-manager `ClusterIssuer` manifest.
+- Main references: `week_5/ui/`, `week_5/manifests/`
 
-### Week 4: REST API
-Build a RESTful API for programmatic database provisioning with OpenAPI specs and unit tests.
+### Week 6: Observability (Next)
+- Planned: Prometheus, Grafana, Loki, and alerting/audit visibility.
 
-📁 [Week 4 Details](week_4/) (Coming soon)
+## Quick Start (Current Flow)
 
-### Week 5: Web UI & Ingress
-User-facing web interface with secure authentication and SSL/TLS.
+### 1. Bootstrap Argo CD root app
+```bash
+kubectl apply -f gitops/root-app.yaml
+```
 
-📁 [Week 5 Details](week_5/) (Coming soon)
+### 2. Verify apps
+```bash
+kubectl get applications -n argocd
+```
 
-### Week 6: Observability
-Prometheus, Grafana, Loki for monitoring and audit logging.
+### 3. Verify control plane workloads
+```bash
+kubectl get pods -n paas-control-plane
+kubectl get ingress -n paas-control-plane
+```
 
-📁 [Week 6 Details](week_6/) (Coming soon)
+Note: TLS issuer manifest lives at `week_5/cluster-issuer.yaml`. If not managed elsewhere, apply it manually before expecting TLS certificate issuance.
 
 ## Technology Stack
+- Infrastructure: OpenStack, Terraform, STACKIT SKE
+- Kubernetes: CRDs, operators, Argo CD GitOps
+- Database: PostgreSQL via CloudNativePG
+- API: Go, Echo, controller-runtime, OpenAPI
+- UI: Vue 3, Vite, Axios, Vue Router, NGINX
+- CI/CD: GitHub Actions (Terraform pipeline)
 
-- **Infrastructure**: OpenStack, Terraform, STACKIT SKE
-- **Kubernetes**: K8s 1.28+, Custom Resources, Operators
-- **Database**: PostgreSQL via CloudNativePG
-- **GitOps**: ArgoCD/Flux (Week 3 Bonus)
-- **API**: Go/Python/Node.js (Week 4)
-- **UI**: Vue.js/React (Week 5)
-- **Observability**: Prometheus, Grafana, Loki (Week 6)
-
-## Learning Outcomes
-
-By completing this project, you will understand:
-- Infrastructure-as-Code with Terraform
-- Kubernetes operators and Custom Resources
-- PaaS architecture and design patterns
-- RESTful API development
-- GitOps workflows
-- Production observability and monitoring
-
-## Architecture Evolution
-
-The architecture grows each week:
-- **Week 1-2**: OpenStack → VMs → Kubernetes
-- **Week 3**: + SKE → CNPG Operator → PostgreSQL Clusters
-- **Week 4**: + REST API → Programmatic provisioning
-- **Week 5**: + Web UI → Ingress → User-facing platform
-- **Week 6**: + Prometheus/Grafana → Full observability
-
-## Contributing
-
-This is a learning project following the STACKIT Cloud-Native Platform track.
-
-## License
-
-Apache License 2.0 - See LICENSE file for details.
-
----
-
-**Current Focus**: Week 3 - Completing GitOps bonus and preparing for Week 4
+## Next Milestone
+Finish Week 5 hardening/documentation and move to Week 6 observability implementation.
