@@ -29,7 +29,7 @@ func main() {
 	// add CORS middleware to allow Swagger UI to communicate with my API
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: []string{"*"},
-		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.DELETE},
+		AllowMethods: []string{echo.GET, echo.PUT, echo.POST, echo.PATCH, echo.DELETE, echo.OPTIONS},
 	}))
 
 	// store app in Echo's context for use in handlers
