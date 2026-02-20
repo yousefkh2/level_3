@@ -21,7 +21,6 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: paas-api-sa
-  namespace: paas-control-plane
 roleRef:
   kind: ClusterRole
   name: cluster-manager-role

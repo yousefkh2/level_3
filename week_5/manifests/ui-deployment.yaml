@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: paas-ui
-  namespace: paas-control-plane
 spec:
   replicas: 2
   selector:
