@@ -4,6 +4,7 @@ import (
 	"context"
 
 	cnpgv1 "github.com/cloudnative-pg/cloudnative-pg/api/v1"
+	"go.uber.org/zap"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -16,7 +17,8 @@ type DatabaseService interface {
 }
 
 type App struct {
-	K8sClient client.Client   // controller-runtime client (not Clientset)
-	DBService DatabaseService // <- now an interface
-	// Later: config, etc.
+	K8sClient client.Client
+	DBService DatabaseService
+	Logger    *zap.Logger
+	Metrics   *Metrics
 }
