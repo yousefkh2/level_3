@@ -27,10 +27,11 @@ func main() {
 	}
 
 	application := &app.App{
-		K8sClient: k8sClient,
-		DBService: services.NewDatabaseService(k8sClient),
-		Logger:    logger,
-		Metrics:   app.NewMetrics(),
+		K8sClient:   k8sClient,
+		DBService:   services.NewDatabaseService(k8sClient),
+		Logger:      logger,
+		Metrics:     app.NewMetrics(),
+		LokiService: services.NewLokiService("http://loki-stack.monitoring.svc.cluster.local:3100"),
 	}
 
 	e := echo.New()
@@ -63,6 +64,7 @@ func main() {
 	e.GET("/databases", handlers.ListDatabases, mw.JWTAuth)
 
 	e.GET("/databases/:name", handlers.GetDatabase, mw.JWTAuth)
+	e.GET("/databases/:name/logs", handlers.GetDatabaseLogs, mw.JWTAuth)
 	e.PATCH("/databases/:name", handlers.UpdateDatabase, mw.JWTAuth)
 	e.DELETE("/databases/:name", handlers.DeleteDatabase, mw.JWTAuth)
 	logger.Info("starting API server", zap.String("addr", ":8080"))

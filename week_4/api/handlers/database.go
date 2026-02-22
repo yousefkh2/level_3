@@ -2,13 +2,15 @@ package handlers
 
 import (
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/labstack/echo/v4"
 	"github.com/yousefkh2/level_3/week_4/api/app"
 	"github.com/yousefkh2/level_3/week_4/api/models"
+	"github.com/yousefkh2/level_3/week_4/api/services"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"net/http"
-	"time"
 )
 
 func CreateDatabase(c echo.Context) error {
@@ -47,6 +49,11 @@ func CreateDatabase(c echo.Context) error {
 		Status:    "creating",
 		CreatedAt: time.Now(),
 	}
+
+	appCtx.LogAuditEvent(c.Request().Context(), app.AuditActionCreate, req.Name,
+		zap.Int("instances", req.Instances),
+		zap.String("storage", req.Storage),
+	)
 
 	return c.JSON(http.StatusCreated, response)
 
@@ -110,6 +117,8 @@ func GetDatabase(c echo.Context) error {
 		Connection: connectionInfo,
 	}
 
+	appCtx.LogAuditEvent(c.Request().Context(), app.AuditActionGet, name)
+
 	return c.JSON(http.StatusOK, response)
 }
 
@@ -126,6 +135,9 @@ func DeleteDatabase(c echo.Context) error {
 		appCtx.Logger.Error("failed to delete database", zap.String("name", name), zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
+
+	appCtx.LogAuditEvent(c.Request().Context(), app.AuditActionDelete, name)
+
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -168,5 +180,36 @@ func UpdateDatabase(c echo.Context) error {
 		CreatedAt: cluster.CreationTimestamp.Time,
 	}
 
+	fields := []zap.Field{}
+	if req.Instances != nil {
+		fields = append(fields, zap.Int("instances", *req.Instances))
+	}
+	if req.Storage != nil {
+		fields = append(fields, zap.String("storage", *req.Storage))
+	}
+	appCtx.LogAuditEvent(c.Request().Context(), app.AuditActionUpdate, name, fields...)
+
 	return c.JSON(http.StatusOK, response)
+}
+
+func GetDatabaseLogs(c echo.Context) error {
+	appCtx := c.Get("app").(*app.App)
+	name := c.Param("name")
+
+	// Query audit logs from the past 24 hours (default)
+	// In the future, this could be a query parameter
+	events, err := appCtx.LokiService.GetAuditLogs(c.Request().Context(), name, 24*time.Hour)
+	if err != nil {
+		appCtx.Logger.Error("failed to fetch audit logs", zap.String("database", name), zap.Error(err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to fetch audit logs"})
+	}
+
+	// Return empty array instead of null for consistency
+	if events == nil {
+		events = make([]services.AuditEvent, 0)
+	}
+
+	appCtx.Logger.Info("audit logs retrieved", zap.String("database", name), zap.Int("count", len(events)))
+
+	return c.JSON(http.StatusOK, events)
 }
