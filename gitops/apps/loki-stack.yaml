@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki-stack
+    targetRevision: 2.10.2
+    helm:
+      values: |
+        loki:
+          persistence:
+            enabled: true
+            size: 10Gi
+
+        # Promtail is the log collection agent.
+        # It runs as a DaemonSet — one pod per node — and tails container logs
+        # from /var/log/pods on each node, then ships them to Loki.
+        promtail:
+          enabled: true
+
+        # We're using the Grafana instance from kube-prometheus-stack,
+        # not a second one bundled with loki-stack.
+        grafana:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
