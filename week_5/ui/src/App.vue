@@ -23,6 +23,7 @@ const editInstances = ref(1)
 const editStorage = ref('1Gi')
 
 const selectedDb = ref(null)
+const copyMessage = ref('')
 
 function setToken(value) {
   token.value = value
@@ -213,6 +214,64 @@ async function showConnection(name) {
   }
 }
 
+function connectionValue(key) {
+  return selectedDb.value?.connection?.[key] || ''
+}
+
+function rwHost() {
+  return connectionValue('host')
+}
+
+function roHost() {
+  const host = rwHost()
+  if (!host) {
+    return ''
+  }
+  if (host.includes('-rw')) {
+    return host.replace('-rw', '-ro')
+  }
+  return `${selectedDb.value?.name || ''}-ro`
+}
+
+function postgresURL(host) {
+  const username = encodeURIComponent(connectionValue('username'))
+  const password = encodeURIComponent(connectionValue('password'))
+  const port = connectionValue('port')
+  const database = encodeURIComponent(connectionValue('database'))
+
+  if (!host || !username || !port || !database) {
+    return ''
+  }
+  return `postgresql://${username}:${password}@${host}:${port}/${database}`
+}
+
+function psqlCommand(host) {
+  const username = connectionValue('username')
+  const password = connectionValue('password')
+  const port = connectionValue('port')
+  const database = connectionValue('database')
+
+  if (!host || !username || !port || !database) {
+    return ''
+  }
+  return `psql "host=${host} port=${port} user=${username} password=${password} dbname=${database} sslmode=disable"`
+}
+
+async function copyText(value, label) {
+  if (!value) {
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(value)
+    copyMessage.value = `${label} copied`
+    setTimeout(() => {
+      copyMessage.value = ''
+    }, 1500)
+  } catch {
+    copyMessage.value = `Failed to copy ${label.toLowerCase()}`
+  }
+}
+
 onMounted(async () => {
   if (token.value) {
     await loadDatabases()
@@ -330,11 +389,43 @@ onMounted(async () => {
           <h3>Connection Info for {{ selectedDb.name }}</h3>
           <button type="button" @click="selectedDb = null">Close</button>
         </div>
-        <p>Host: {{ selectedDb.connection?.host || '-' }}</p>
+        <p v-if="copyMessage" class="copy-message">{{ copyMessage }}</p>
         <p>Port: {{ selectedDb.connection?.port || '-' }}</p>
         <p>Username: {{ selectedDb.connection?.username || '-' }}</p>
         <p>Password: {{ selectedDb.connection?.password || '-' }}</p>
         <p>Database: {{ selectedDb.connection?.database || '-' }}</p>
+
+        <div class="connection-block">
+          <h4>Service Endpoints</h4>
+          <div class="connection-line">
+            <span><strong>Read/Write:</strong> {{ rwHost() || '-' }}</span>
+            <button type="button" @click="copyText(rwHost(), 'Read/write host')">Copy</button>
+          </div>
+          <div class="connection-line">
+            <span><strong>Read-Only:</strong> {{ roHost() || '-' }}</span>
+            <button type="button" @click="copyText(roHost(), 'Read-only host')">Copy</button>
+          </div>
+        </div>
+
+        <div class="connection-block">
+          <h4>Connection Strings</h4>
+          <div class="connection-line">
+            <code>{{ postgresURL(rwHost()) || '-' }}</code>
+            <button type="button" @click="copyText(postgresURL(rwHost()), 'PostgreSQL URL')">Copy</button>
+          </div>
+          <div class="connection-line">
+            <code>{{ psqlCommand(rwHost()) || '-' }}</code>
+            <button type="button" @click="copyText(psqlCommand(rwHost()), 'psql command')">Copy</button>
+          </div>
+        </div>
+
+        <p class="note">
+          SSL note: these endpoints are internal cluster services. In-cluster clients can use
+          <code>sslmode=disable</code>.
+        </p>
+        <p class="warning">
+          Internal-only access: these hosts are only reachable from inside the Kubernetes cluster/VPN.
+        </p>
       </section>
     </section>
   </main>
@@ -454,5 +545,42 @@ button:disabled {
   padding: 12px;
   display: grid;
   gap: 8px;
+}
+
+.connection-block {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.connection-line {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+code {
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 6px 8px;
+  word-break: break-all;
+}
+
+.copy-message {
+  color: #065f46;
+  font-size: 14px;
+}
+
+.note {
+  font-size: 14px;
+  color: #374151;
+}
+
+.warning {
+  font-size: 14px;
+  color: #92400e;
 }
 </style>
