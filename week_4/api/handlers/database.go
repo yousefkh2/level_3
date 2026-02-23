@@ -10,7 +10,9 @@ import (
 	"github.com/yousefkh2/level_3/week_4/api/models"
 	"github.com/yousefkh2/level_3/week_4/api/services"
 	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func CreateDatabase(c echo.Context) error {
@@ -99,11 +101,26 @@ func GetDatabase(c echo.Context) error {
 		appCtx.Logger.Error("failed to get database", zap.String("name", name), zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
+
+	password := ""
+	var appSecret corev1.Secret
+	secretName := fmt.Sprintf("%s-app", cluster.Name)
+	secretErr := appCtx.K8sClient.Get(c.Request().Context(), client.ObjectKey{
+		Name:      secretName,
+		Namespace: cluster.Namespace,
+	}, &appSecret)
+	if secretErr != nil {
+		appCtx.Logger.Warn("failed to get database credentials secret", zap.String("name", name), zap.String("secret", secretName), zap.Error(secretErr))
+	} else {
+		password = string(appSecret.Data["password"])
+	}
+
 	connectionInfo := models.ConnectionInfo{
-		Host:     fmt.Sprintf("%s-rw.default.svc.cluster.local", cluster.Name),
+		Host:     fmt.Sprintf("%s-rw.%s.svc.cluster.local", cluster.Name, cluster.Namespace),
 		Port:     5432,
 		Database: "app",
 		Username: "app",
+		Password: password,
 	}
 
 	response := models.DatabaseDetailResponse{

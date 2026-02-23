@@ -392,7 +392,7 @@ onMounted(async () => {
         <p v-if="copyMessage" class="copy-message">{{ copyMessage }}</p>
         <p>Port: {{ selectedDb.connection?.port || '-' }}</p>
         <p>Username: {{ selectedDb.connection?.username || '-' }}</p>
-        <p>Password: {{ selectedDb.connection?.password || '-' }}</p>
+        <p>Password: {{ selectedDb.connection?.password ? '********' : '-' }}</p>
         <p>Database: {{ selectedDb.connection?.database || '-' }}</p>
 
         <div class="connection-block">

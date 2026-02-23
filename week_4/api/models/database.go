@@ -33,6 +33,7 @@ type ConnectionInfo struct {
 	Port     int    `json:"port"`
 	Database string `json:"database"`
 	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type UpdateDatabaseRequest struct {

@@ -23,4 +23,4 @@ commonAnnotations:
 
 images:
   - name: registry.onstackit.cloud/level-3-paas/paas-ui
-    newTag: git-6d7197d-20260223164001
+    newTag: git-8961a1c-20260223220740
