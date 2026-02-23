@@ -1,16 +1,15 @@
-@import './base.css';
-
-#app {
-  min-height: 100vh;
+* {
+  box-sizing: border-box;
 }
 
-.page-enter-active,
-.page-leave-active {
-  transition: opacity 220ms ease, transform 220ms ease;
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: #f6f7f9;
+  color: #1f2937;
 }
 
-.page-enter-from,
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(6px);
+button,
+input {
+  font: inherit;
 }

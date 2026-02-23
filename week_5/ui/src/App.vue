@@ -1,153 +1,458 @@
 <script setup>
-import { RouterLink, RouterView, useRouter } from 'vue-router'
-import { ref, onBeforeUnmount, onMounted } from 'vue'
-import { getToken, clearToken } from '@/services/api'
+import { onMounted, ref } from 'vue'
 
-const router = useRouter()
-const isLoggedIn = ref(false)
-let removeAfterEachHook = null
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
-const checkAuth = () => {
-  isLoggedIn.value = !!getToken()
+const token = ref(localStorage.getItem('token') || '')
+const loginUsername = ref('')
+const loginPassword = ref('')
+const loginBusy = ref(false)
+const loginError = ref('')
+
+const databases = ref([])
+const loadingDatabases = ref(false)
+const busyAction = ref('')
+const errorMessage = ref('')
+
+const newName = ref('')
+const newInstances = ref(1)
+const newStorage = ref('1Gi')
+
+const editingName = ref('')
+const editInstances = ref(1)
+const editStorage = ref('1Gi')
+
+const selectedDb = ref(null)
+
+function setToken(value) {
+  token.value = value
+
+  if (value) {
+    localStorage.setItem('token', value)
+    return
+  }
+
+  localStorage.removeItem('token')
 }
 
-const logout = () => {
-  clearToken()
-  isLoggedIn.value = false
-  router.push('/login')
+async function request(path, options = {}) {
+  const config = {
+    method: options.method || 'GET',
+    headers: {},
+  }
+
+  if (options.body !== undefined) {
+    config.headers['Content-Type'] = 'application/json'
+    config.body = JSON.stringify(options.body)
+  }
+
+  if (token.value) {
+    config.headers.Authorization = `Bearer ${token.value}`
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, config)
+
+  if (response.status === 204) {
+    return null
+  }
+
+  let data = null
+
+  try {
+    data = await response.json()
+  } catch {
+    data = null
+  }
+
+  if (!response.ok) {
+    const message = data?.error || data?.message || `Request failed (${response.status})`
+    throw new Error(message)
+  }
+
+  return data
 }
 
-onMounted(() => {
-  checkAuth()
-  removeAfterEachHook = router.afterEach(() => {
-    checkAuth()
-  })
-})
+async function login() {
+  loginBusy.value = true
+  loginError.value = ''
 
-onBeforeUnmount(() => {
-  if (typeof removeAfterEachHook === 'function') {
-    removeAfterEachHook()
+  try {
+    const data = await request('/auth/login', {
+      method: 'POST',
+      body: {
+        username: loginUsername.value,
+        password: loginPassword.value,
+      },
+    })
+
+    setToken(data.token)
+    loginUsername.value = ''
+    loginPassword.value = ''
+    await loadDatabases()
+  } catch (error) {
+    loginError.value = error.message
+  } finally {
+    loginBusy.value = false
+  }
+}
+
+function logout() {
+  setToken('')
+  databases.value = []
+  selectedDb.value = null
+  editingName.value = ''
+  errorMessage.value = ''
+}
+
+async function loadDatabases() {
+  loadingDatabases.value = true
+  errorMessage.value = ''
+
+  try {
+    const data = await request('/databases')
+    databases.value = Array.isArray(data) ? data : []
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    loadingDatabases.value = false
+  }
+}
+
+async function createDatabase() {
+  busyAction.value = 'create'
+  errorMessage.value = ''
+
+  try {
+    await request('/databases', {
+      method: 'POST',
+      body: {
+        name: newName.value,
+        instances: Number(newInstances.value),
+        storage: newStorage.value,
+      },
+    })
+
+    newName.value = ''
+    newInstances.value = 1
+    newStorage.value = '1Gi'
+    await loadDatabases()
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+function startEdit(db) {
+  editingName.value = db.name
+  editInstances.value = db?.spec?.instances ?? 1
+  editStorage.value = db?.spec?.storage ?? '1Gi'
+}
+
+function cancelEdit() {
+  editingName.value = ''
+  editInstances.value = 1
+  editStorage.value = '1Gi'
+}
+
+async function saveEdit(name) {
+  busyAction.value = `edit:${name}`
+  errorMessage.value = ''
+
+  try {
+    await request(`/databases/${name}`, {
+      method: 'PATCH',
+      body: {
+        instances: Number(editInstances.value),
+        storage: editStorage.value,
+      },
+    })
+
+    cancelEdit()
+    await loadDatabases()
+
+    if (selectedDb.value?.name === name) {
+      await showConnection(name)
+    }
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function deleteDatabase(name) {
+  busyAction.value = `delete:${name}`
+  errorMessage.value = ''
+
+  try {
+    await request(`/databases/${name}`, { method: 'DELETE' })
+
+    if (selectedDb.value?.name === name) {
+      selectedDb.value = null
+    }
+
+    await loadDatabases()
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+async function showConnection(name) {
+  busyAction.value = `connection:${name}`
+  errorMessage.value = ''
+
+  try {
+    selectedDb.value = await request(`/databases/${name}`)
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+onMounted(async () => {
+  if (token.value) {
+    await loadDatabases()
   }
 })
 </script>
 
 <template>
-  <div class="app-shell">
-    <header class="top-bar">
-      <div class="container top-bar__inner">
-        <RouterLink class="brand" to="/databases">
-          <span class="brand__dot" />
-          <span class="brand__name">PaaS Control Plane</span>
-        </RouterLink>
+  <main class="page">
+    <h1>PaaS Control Plane</h1>
 
-        <nav class="top-nav" aria-label="Primary">
-          <RouterLink v-if="!isLoggedIn" class="nav-link" to="/login">Login</RouterLink>
-          <RouterLink v-if="isLoggedIn" class="nav-link" to="/databases">Databases</RouterLink>
-          <button v-if="isLoggedIn" type="button" class="ghost-button" @click="logout">Logout</button>
-        </nav>
-      </div>
-    </header>
+    <section v-if="!token" class="panel">
+      <h2>Login</h2>
+      <form class="form" @submit.prevent="login">
+        <label>
+          Username
+          <input v-model="loginUsername" placeholder="Username" required />
+        </label>
 
-    <main class="main-content">
-      <div class="container">
-        <RouterView v-slot="{ Component }">
-          <Transition name="page" mode="out-in">
-            <component :is="Component" />
-          </Transition>
-        </RouterView>
+        <label>
+          Password
+          <input v-model="loginPassword" type="password" placeholder="Password" required />
+        </label>
+
+        <button type="submit" :disabled="loginBusy">
+          {{ loginBusy ? 'Signing in...' : 'Login' }}
+        </button>
+      </form>
+
+      <p v-if="loginError" class="error">{{ loginError }}</p>
+    </section>
+
+    <section v-else class="panel">
+      <div class="header-row">
+        <h2>My Databases</h2>
+        <div class="buttons-inline">
+          <button type="button" @click="loadDatabases" :disabled="loadingDatabases">
+            {{ loadingDatabases ? 'Refreshing...' : 'Refresh' }}
+          </button>
+          <button type="button" @click="logout">Logout</button>
+        </div>
       </div>
-    </main>
-  </div>
+
+      <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+
+      <form class="form create-form" @submit.prevent="createDatabase">
+        <h3>Create</h3>
+        <label>
+          Name
+          <input v-model="newName" placeholder="Database Name" required />
+        </label>
+
+        <label>
+          Instances
+          <input v-model.number="newInstances" type="number" min="1" placeholder="Instances" required />
+        </label>
+
+        <label>
+          Storage
+          <input v-model="newStorage" placeholder="Storage (e.g., 1Gi)" required />
+        </label>
+
+        <button type="submit" :disabled="busyAction === 'create'">
+          {{ busyAction === 'create' ? 'Creating...' : 'Create' }}
+        </button>
+      </form>
+
+      <h3>List</h3>
+      <p v-if="loadingDatabases">Loading...</p>
+      <p v-else-if="databases.length === 0">No databases yet.</p>
+
+      <ul v-else class="db-list">
+        <li v-for="db in databases" :key="db.name" class="db-item">
+          <div>
+            <strong>{{ db.name }}</strong>
+            <div class="meta">
+              status: {{ db.status || 'unknown' }} | instances: {{ db.spec?.instances || 'n/a' }} | storage:
+              {{ db.spec?.storage || 'n/a' }}
+            </div>
+          </div>
+
+          <div class="buttons-inline">
+            <button type="button" @click="startEdit(db)">Edit</button>
+            <button type="button" @click="showConnection(db.name)" :disabled="busyAction === `connection:${db.name}`">
+              View Connection Info
+            </button>
+            <button type="button" @click="deleteDatabase(db.name)" :disabled="busyAction === `delete:${db.name}`">
+              {{ busyAction === `delete:${db.name}` ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
+
+          <form v-if="editingName === db.name" class="form edit-form" @submit.prevent="saveEdit(db.name)">
+            <label>
+              Instances
+              <input v-model.number="editInstances" type="number" min="1" required />
+            </label>
+
+            <label>
+              Storage
+              <input v-model="editStorage" placeholder="Storage (e.g., 2Gi)" required />
+            </label>
+
+            <div class="buttons-inline">
+              <button type="submit" :disabled="busyAction === `edit:${db.name}`">
+                {{ busyAction === `edit:${db.name}` ? 'Saving...' : 'Save Changes' }}
+              </button>
+              <button type="button" @click="cancelEdit">Cancel</button>
+            </div>
+          </form>
+        </li>
+      </ul>
+
+      <section v-if="selectedDb" class="connection-info">
+        <div class="header-row">
+          <h3>Connection Info for {{ selectedDb.name }}</h3>
+          <button type="button" @click="selectedDb = null">Close</button>
+        </div>
+        <p>Host: {{ selectedDb.connection?.host || '-' }}</p>
+        <p>Port: {{ selectedDb.connection?.port || '-' }}</p>
+        <p>Username: {{ selectedDb.connection?.username || '-' }}</p>
+        <p>Password: {{ selectedDb.connection?.password || '-' }}</p>
+        <p>Database: {{ selectedDb.connection?.database || '-' }}</p>
+      </section>
+    </section>
+  </main>
 </template>
 
 <style scoped>
-.app-shell {
-  min-height: 100vh;
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
-.top-bar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  backdrop-filter: blur(8px);
-  background: rgb(243 245 248 / 80%);
-  border-bottom: 1px solid var(--color-border);
+h1,
+h2,
+h3,
+p {
+  margin: 0;
 }
 
-.top-bar__inner {
-  min-height: 72px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-4);
+h1 {
+  margin-bottom: 16px;
 }
 
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--color-text-strong);
+.panel {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
 }
 
-.brand__dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #33a0ff, var(--color-primary));
-  box-shadow: 0 0 0 6px rgb(15 131 253 / 14%);
+.form {
+  display: grid;
+  gap: 12px;
 }
 
-.brand__name {
-  font-size: 15px;
-  font-weight: 620;
-  letter-spacing: -0.02em;
+.form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
 }
 
-.top-nav {
-  display: inline-flex;
-  gap: var(--space-2);
-  align-items: center;
+input {
+  border: 1px solid #9ca3af;
+  border-radius: 6px;
+  padding: 8px;
 }
 
-.nav-link,
-.ghost-button {
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  font-size: var(--text-label);
-  font-weight: 560;
-  color: var(--color-text);
-  padding: 8px 14px;
-  background: transparent;
-  transition: all 180ms ease;
-}
-
-.nav-link:hover,
-.ghost-button:hover {
-  border-color: var(--color-border);
-  background: var(--color-surface);
-}
-
-.nav-link.router-link-exact-active {
-  color: var(--color-text-strong);
-  background: var(--color-surface);
-  border-color: var(--color-border-strong);
-}
-
-.ghost-button {
+button {
+  border: 1px solid #9ca3af;
+  background: #f9fafb;
+  border-radius: 6px;
+  padding: 8px 12px;
   cursor: pointer;
 }
 
-.main-content {
-  padding-block: var(--space-7) var(--space-8);
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-@media (max-width: 640px) {
-  .top-bar__inner {
-    min-height: 64px;
-  }
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
-  .brand__name {
-    font-size: 14px;
-  }
+.buttons-inline {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+.create-form {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.db-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.db-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.meta {
+  margin-top: 4px;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.edit-form {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+}
+
+.connection-info {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
 }
 </style>
