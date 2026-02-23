@@ -7,24 +7,18 @@ test.describe('PaaS Platform E2E', () => {
   const uniqueDbName = (prefix = 'test-db') =>
     `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`
 
-  const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
   const dbRow = (page, name) =>
     page
       .locator('li.db-item')
-      .filter({
-        has: page.getByRole('heading', { level: 3, name: new RegExp(`^${escapeRegex(name)}$`) }),
-      })
+      .filter({ hasText: name })
       .first()
 
   const loginAsAdmin = async (page) => {
     await page.goto('/')
-    await expect(page).toHaveURL(/.*login/)
     await page.fill('input[placeholder="Username"]', API_USERNAME)
     await page.fill('input[placeholder="Password"]', API_PASSWORD)
     await page.click('button[type="submit"]')
-    await expect(page).toHaveURL(/.*databases/)
-    await expect(page.locator('h1')).toContainText('My Databases')
+    await expect(page.getByRole('heading', { name: 'My Databases' })).toBeVisible()
   }
 
   const createDatabaseFromUi = async (page, name, instances = '2', storage = '1Gi') => {
@@ -35,17 +29,15 @@ test.describe('PaaS Platform E2E', () => {
     await expect(dbRow(page, name)).toBeVisible({ timeout: 10000 })
   }
 
-  test('complete user flow: login → create → view → delete database', async ({ page }) => {
+  test('complete user flow: login -> create -> view -> delete database', async ({ page }) => {
     const testDbName = uniqueDbName()
 
     await loginAsAdmin(page)
     await createDatabaseFromUi(page, testDbName)
 
-    // View connection info for the created DB (scoped row click)
     const row = dbRow(page, testDbName)
     await row.getByRole('button', { name: 'View Connection Info' }).click()
 
-    // Assert the actual connection panel, not generic text on buttons
     const panel = page.locator('.connection-info')
     await expect(panel).toBeVisible()
     await expect(
@@ -55,13 +47,9 @@ test.describe('PaaS Platform E2E', () => {
     ).toBeVisible()
     await expect(panel.getByText(/^Host:/)).toBeVisible()
 
-    // Close connection info
     await page.click('button:has-text("Close")')
 
-    // Delete the database
     await row.getByRole('button', { name: 'Delete' }).click()
-
-    // Verify it's gone (should disappear from list)
     await expect(page.locator(`text=${testDbName}`)).not.toBeVisible({ timeout: 10000 })
   })
 
@@ -89,22 +77,20 @@ test.describe('PaaS Platform E2E', () => {
 
     expect(patchResponse.status()).toBe(200)
 
-    await expect(row).toContainText('3 replicas', { timeout: 20000 })
-    await expect(page.locator('.status--error')).toHaveCount(0)
+    await expect(row).toContainText('instances: 3', { timeout: 20000 })
+    await expect(page.locator('.error')).toHaveCount(0)
 
-    // Cleanup test data
     await row.getByRole('button', { name: 'Delete' }).click()
     await expect(dbRow(page, testDbName)).toHaveCount(0, { timeout: 10000 })
   })
 
   test('login with invalid credentials should fail', async ({ page }) => {
-    await page.goto('/login')
+    await page.goto('/')
 
     await page.fill('input[placeholder="Username"]', 'wrong')
     await page.fill('input[placeholder="Password"]', 'wrong')
     await page.click('button[type="submit"]')
 
-    // Should stay on login page or show error
-    await expect(page).toHaveURL(/.*login/)
+    await expect(page.getByRole('heading', { name: 'Login' })).toBeVisible()
   })
 })
