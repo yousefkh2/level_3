@@ -27,6 +27,8 @@ const copyMessage = ref('')
 
 const dbLogs = ref([])
 const selectedDbLogs = ref(null)
+const logsHours = ref(24)
+const selectedLogsHours = ref(24)
 
 function setToken(value) {
   token.value = value
@@ -104,6 +106,8 @@ function logout() {
   setToken('')
   databases.value = []
   selectedDb.value = null
+  selectedDbLogs.value = null
+  dbLogs.value = []
   editingName.value = ''
   errorMessage.value = ''
 }
@@ -222,13 +226,43 @@ async function loadLogs(name) {
   errorMessage.value = ''
 
   try {
-    dbLogs.value = await request(`/databases/${name}/logs`)
+    const hours = validatedLogHours()
+    dbLogs.value = await request(`/databases/${name}/logs?hours=${encodeURIComponent(hours)}`)
     selectedDbLogs.value = name
+    selectedLogsHours.value = hours
   } catch (error) {
     errorMessage.value = error.message
   } finally {
     busyAction.value = ''
   }
+}
+
+async function loadGlobalLogs() {
+  busyAction.value = 'logs:global'
+  errorMessage.value = ''
+
+  try {
+    const hours = validatedLogHours()
+    dbLogs.value = await request(`/audit/logs?hours=${encodeURIComponent(hours)}`)
+    selectedDbLogs.value = 'All Databases'
+    selectedLogsHours.value = hours
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    busyAction.value = ''
+  }
+}
+
+function closeLogsPanel() {
+  selectedDbLogs.value = null
+}
+
+function validatedLogHours() {
+  const hours = Number(logsHours.value)
+  if (!Number.isInteger(hours) || hours <= 0) {
+    throw new Error('Hours must be a positive whole number')
+  }
+  return hours
 }
 
 function connectionValue(key) {
@@ -325,8 +359,15 @@ onMounted(async () => {
       <div class="header-row">
         <h2>My Databases</h2>
         <div class="buttons-inline">
+          <label class="hours-filter">
+            Logs window (hours)
+            <input v-model.number="logsHours" type="number" min="1" step="1" />
+          </label>
           <button type="button" @click="loadDatabases" :disabled="loadingDatabases">
             {{ loadingDatabases ? 'Refreshing...' : 'Refresh' }}
+          </button>
+          <button type="button" @click="loadGlobalLogs" :disabled="busyAction === 'logs:global'">
+            {{ busyAction === 'logs:global' ? 'Loading Audit...' : 'View Global Audit Feed' }}
           </button>
           <button type="button" @click="logout">Logout</button>
         </div>
@@ -450,14 +491,15 @@ onMounted(async () => {
 
       <section v-if="selectedDbLogs" class="logs-panel">
         <div class="header-row">
-          <h3>Database Logs for {{ selectedDbLogs }}</h3>
-          <button type="button" @click="selectedDbLogs = null">Close</button>
+          <h3>Audit Logs for {{ selectedDbLogs }} (last {{ selectedLogsHours }}h)</h3>
+          <button type="button" @click="closeLogsPanel">Close</button>
         </div>
         <p v-if="dbLogs.length === 0" class="no-logs">No logs available</p>
         <table v-else class="logs-table">
           <thead>
             <tr>
               <th>Timestamp</th>
+              <th>Resource</th>
               <th>Action</th>
               <th>Details</th>
             </tr>
@@ -465,6 +507,7 @@ onMounted(async () => {
           <tbody>
             <tr v-for="(log, index) in dbLogs" :key="index" class="log-row">
               <td class="timestamp">{{ log.timestamp || '-' }}</td>
+              <td class="resource">{{ log.resource || '-' }}</td>
               <td class="action">{{ log.action || '-' }}</td>
               <td class="details">{{ log.details || '-' }}</td>
             </tr>
@@ -544,6 +587,18 @@ button:disabled {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.hours-filter {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.hours-filter input {
+  width: 96px;
+  padding: 6px 8px;
 }
 
 .error {
