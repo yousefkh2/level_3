@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+/*
+	This is the adapter that turns raw Loki log lines into structured audit history.
+*/
+
 // AuditEvent represents a single parsed audit log entry returned to the user.
 type AuditEvent struct {
 	Timestamp time.Time `json:"timestamp"`
@@ -38,12 +42,19 @@ type lokiQueryResponse struct {
 }
 
 func (s *LokiService) GetAuditLogs(ctx context.Context, databaseName string, since time.Duration) ([]AuditEvent, error) {
-
 	query := fmt.Sprintf(
 		`{namespace="paas-control-plane"} | json | log_type="audit" | resource="%s"`,
 		databaseName,
 	)
+	return s.queryAuditLogs(ctx, query, since)
+}
 
+func (s *LokiService) GetGlobalAuditLogs(ctx context.Context, since time.Duration) ([]AuditEvent, error) {
+	query := `{namespace="paas-control-plane"} | json | log_type="audit"`
+	return s.queryAuditLogs(ctx, query, since)
+}
+
+func (s *LokiService) queryAuditLogs(ctx context.Context, query string, since time.Duration) ([]AuditEvent, error) {
 	// Build the HTTP request to Loki's query_range endpoint
 	params := url.Values{}
 	params.Set("query", query)

@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -14,6 +15,22 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const defaultAuditLookbackHours = 24
+
+func parseAuditLookback(c echo.Context) (time.Duration, error) {
+	hoursParam := c.QueryParam("hours")
+	if hoursParam == "" {
+		return defaultAuditLookbackHours * time.Hour, nil
+	}
+
+	hours, err := strconv.Atoi(hoursParam)
+	if err != nil || hours <= 0 {
+		return 0, fmt.Errorf("invalid hours query param: must be a positive integer")
+	}
+
+	return time.Duration(hours) * time.Hour, nil
+}
 
 func CreateDatabase(c echo.Context) error {
 	appCtx := c.Get("app").(*app.App)
@@ -133,9 +150,6 @@ func GetDatabase(c echo.Context) error {
 		CreatedAt:  cluster.CreationTimestamp.Time,
 		Connection: connectionInfo,
 	}
-
-	appCtx.LogAuditEvent(c.Request().Context(), app.AuditActionGet, name)
-
 	return c.JSON(http.StatusOK, response)
 }
 
@@ -213,9 +227,12 @@ func GetDatabaseLogs(c echo.Context) error {
 	appCtx := c.Get("app").(*app.App)
 	name := c.Param("name")
 
-	// Query audit logs from the past 24 hours (default)
-	// In the future, this could be a query parameter
-	events, err := appCtx.LokiService.GetAuditLogs(c.Request().Context(), name, 24*time.Hour)
+	since, err := parseAuditLookback(c)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	events, err := appCtx.LokiService.GetAuditLogs(c.Request().Context(), name, since)
 	if err != nil {
 		appCtx.Logger.Error("failed to fetch audit logs", zap.String("database", name), zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to fetch audit logs"})
@@ -227,6 +244,29 @@ func GetDatabaseLogs(c echo.Context) error {
 	}
 
 	appCtx.Logger.Info("audit logs retrieved", zap.String("database", name), zap.Int("count", len(events)))
+
+	return c.JSON(http.StatusOK, events)
+}
+
+func GetGlobalAuditLogs(c echo.Context) error {
+	appCtx := c.Get("app").(*app.App)
+
+	since, err := parseAuditLookback(c)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	events, err := appCtx.LokiService.GetGlobalAuditLogs(c.Request().Context(), since)
+	if err != nil {
+		appCtx.Logger.Error("failed to fetch global audit logs", zap.Error(err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to fetch audit logs"})
+	}
+
+	if events == nil {
+		events = make([]services.AuditEvent, 0)
+	}
+
+	appCtx.Logger.Info("global audit logs retrieved", zap.Int("count", len(events)))
 
 	return c.JSON(http.StatusOK, events)
 }

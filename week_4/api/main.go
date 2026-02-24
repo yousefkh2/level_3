@@ -65,6 +65,7 @@ func main() {
 
 	e.GET("/databases/:name", handlers.GetDatabase, mw.JWTAuth)
 	e.GET("/databases/:name/logs", handlers.GetDatabaseLogs, mw.JWTAuth)
+	e.GET("/audit/logs", handlers.GetGlobalAuditLogs, mw.JWTAuth)
 	e.PATCH("/databases/:name", handlers.UpdateDatabase, mw.JWTAuth)
 	e.DELETE("/databases/:name", handlers.DeleteDatabase, mw.JWTAuth)
 	logger.Info("starting API server", zap.String("addr", ":8080"))
