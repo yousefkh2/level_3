@@ -25,6 +25,9 @@ const editStorage = ref('1Gi')
 const selectedDb = ref(null)
 const copyMessage = ref('')
 
+const dbLogs = ref([])
+const selectedDbLogs = ref(null)
+
 function setToken(value) {
   token.value = value
 
@@ -214,6 +217,20 @@ async function showConnection(name) {
   }
 }
 
+async function loadLogs(name) {
+  busyAction.value = `logs:${name}`
+  errorMessage.value = ''
+
+  try {
+    dbLogs.value = await request(`/databases/${name}/logs`)
+    selectedDbLogs.value = name
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    busyAction.value = ''
+  }
+}
+
 function connectionValue(key) {
   return selectedDb.value?.connection?.[key] || ''
 }
@@ -358,6 +375,9 @@ onMounted(async () => {
             <button type="button" @click="showConnection(db.name)" :disabled="busyAction === `connection:${db.name}`">
               View Connection Info
             </button>
+            <button type="button" @click="loadLogs(db.name)" :disabled="busyAction === `logs:${db.name}`">
+              {{ busyAction === `logs:${db.name}` ? 'Loading Logs...' : 'View Logs' }}
+            </button>
             <button type="button" @click="deleteDatabase(db.name)" :disabled="busyAction === `delete:${db.name}`">
               {{ busyAction === `delete:${db.name}` ? 'Deleting...' : 'Delete' }}
             </button>
@@ -426,6 +446,30 @@ onMounted(async () => {
         <p class="warning">
           Internal-only access: these hosts are only reachable from inside the Kubernetes cluster/VPN.
         </p>
+      </section>
+
+      <section v-if="selectedDbLogs" class="logs-panel">
+        <div class="header-row">
+          <h3>Database Logs for {{ selectedDbLogs }}</h3>
+          <button type="button" @click="selectedDbLogs = null">Close</button>
+        </div>
+        <p v-if="dbLogs.length === 0" class="no-logs">No logs available</p>
+        <table v-else class="logs-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Action</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(log, index) in dbLogs" :key="index" class="log-row">
+              <td class="timestamp">{{ log.timestamp || '-' }}</td>
+              <td class="action">{{ log.action || '-' }}</td>
+              <td class="details">{{ log.details || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
     </section>
   </main>
@@ -567,6 +611,61 @@ code {
   border-radius: 6px;
   padding: 6px 8px;
   word-break: break-all;
+}
+
+.logs-panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.logs-table thead {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.logs-table th {
+  padding: 8px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.logs-table td {
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.log-row:hover {
+  background: #f9fafb;
+}
+
+.timestamp {
+  width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action {
+  width: 120px;
+  font-weight: 500;
+}
+
+.details {
+  word-break: break-word;
+}
+
+.no-logs {
+  color: #6b7280;
+  font-style: italic;
 }
 
 .copy-message {
