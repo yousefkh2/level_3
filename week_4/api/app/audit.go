@@ -11,7 +11,6 @@ const (
 	AuditActionCreate AuditAction = "create"
 	AuditActionDelete AuditAction = "delete"
 	AuditActionUpdate AuditAction = "update"
-	AuditActionGet    AuditAction = "get"
 	AuditActionList   AuditAction = "list"
 )
 

@@ -1,5 +1,7 @@
 # Local configuration with credentials
 local.conf
+key.json
+sa-key*.json
 
 # Terraform
 .terraform/
@@ -9,7 +11,6 @@ terraform.tfstate.*
 *.tfvars
 !example.tfvars
 kubeconfig.yaml
-sa-key*.json
 
 # IDE
 .vscode/
@@ -22,12 +23,12 @@ sa-key*.json
 .DS_Store
 Thumbs.db
 *.pem
-
-
-
-key.json
 cl-q801m3if.yml
 week_4/tests/load-test-result.json
 
 # Go cache (local workspace cache override)
 .gocache/
+
+# Local binaries/downloads
+kubectl
+kubectl.sha256

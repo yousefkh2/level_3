@@ -15,6 +15,7 @@ func Observability(application *app.App) echo.MiddlewareFunc {
 			req := c.Request()
 			start := time.Now()
 
+			//app.Metrics => Prometheus
 			application.Metrics.RequestsInFlight.Inc()
 			defer application.Metrics.RequestsInFlight.Dec()
 
@@ -31,10 +32,13 @@ func Observability(application *app.App) echo.MiddlewareFunc {
 
 			statusStr := fmt.Sprintf("%d", status)
 
+			//traffic/errors
 			application.Metrics.RequestsTotal.WithLabelValues(method, path, statusStr).Inc()
 
+			//latency
 			application.Metrics.RequestDuration.WithLabelValues(method, path).Observe(duration.Seconds())
 
+			//Now, loki: structured logging
 			fields := []zap.Field{
 				zap.String("method", method),
 				zap.String("path", path),
