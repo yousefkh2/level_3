@@ -24,4 +24,4 @@ commonAnnotations:
 # Image transformation (update image tag here for new versions)
 images:
   - name: registry.onstackit.cloud/level-3-paas/paas-api
-    newTag: git-8961a1c-20260223220609
+    newTag: git-6fda228-20260224143808
