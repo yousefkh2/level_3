@@ -74,8 +74,14 @@ func (w *StatusWatcher) reconcile(ctx context.Context) {
 		previous, seen := w.lastKnownStatus[name]
 
 		if !seen {
-			// First time we see this database — record its status but don't log yet.
-			// We only want to log *transitions*, not the initial state.
+			// First time we see this database — emit an initial status event so
+			// status logs are useful immediately after startup/redeploy.
+			w.logger.Info("service event",
+				zap.String("log_type", "service"),
+				zap.String("resource", name),
+				zap.String("current_status", phase),
+				zap.String("event", "initial status observed: "+phase),
+			)
 			w.lastKnownStatus[name] = phase
 			continue
 		}
