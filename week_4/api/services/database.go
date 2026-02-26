@@ -13,6 +13,8 @@ type DatabaseService struct {
 	K8sClient client.Client // controller-runtime client (instead of clientSet)
 }
 
+const DatabaseNamespace = "default"
+
 func NewDatabaseService(k8sClient client.Client) *DatabaseService {
 	return &DatabaseService{K8sClient: k8sClient}
 }
@@ -21,7 +23,7 @@ func (s *DatabaseService) CreateDatabase(ctx context.Context, name string, insta
 	cluster := &cnpgv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "default",
+			Namespace: DatabaseNamespace,
 		},
 		Spec: cnpgv1.ClusterSpec{
 			Instances: instances,
@@ -42,7 +44,7 @@ func (s *DatabaseService) CreateDatabase(ctx context.Context, name string, insta
 func (s *DatabaseService) ListDatabases(ctx context.Context) ([]cnpgv1.Cluster, error) {
 	var clusterList cnpgv1.ClusterList
 
-	err := s.K8sClient.List(ctx, &clusterList, client.InNamespace("default"))
+	err := s.K8sClient.List(ctx, &clusterList, client.InNamespace(DatabaseNamespace))
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +57,7 @@ func (s *DatabaseService) GetDatabase(ctx context.Context, name string) (*cnpgv1
 
 	err := s.K8sClient.Get(ctx, client.ObjectKey{
 		Name:      name,
-		Namespace: "default",
+		Namespace: DatabaseNamespace,
 	}, &cluster)
 
 	if err != nil {
@@ -69,7 +71,7 @@ func (s *DatabaseService) DeleteDatabase(ctx context.Context, name string) error
 	cluster := &cnpgv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "default",
+			Namespace: DatabaseNamespace,
 		},
 	}
 
@@ -80,7 +82,7 @@ func (s *DatabaseService) UpdateDatabase(ctx context.Context, name string, insta
 	var cluster cnpgv1.Cluster
 	err := s.K8sClient.Get(ctx, client.ObjectKey{
 		Name:      name,
-		Namespace: "default",
+		Namespace: DatabaseNamespace,
 	}, &cluster)
 	if err != nil {
 		return nil, err

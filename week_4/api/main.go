@@ -2,7 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -22,8 +27,8 @@ func main() {
 	}
 	defer logger.Sync()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	k8sClient, err := config.NewKubernetesClient()
 	if err != nil {
@@ -38,8 +43,8 @@ func main() {
 		LokiService: services.NewLokiService("http://loki-stack.monitoring.svc.cluster.local:3100"),
 	}
 
-	watcher := services.NewStatusWatcher(k8sClient, logger, "paas-control-plane")
-	go watcher.Start(ctx)
+	watcher := services.NewStatusWatcher(k8sClient, logger, services.DatabaseNamespace)
+	go watcher.Start(rootCtx)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -76,6 +81,20 @@ func main() {
 	e.GET("/audit/logs", handlers.GetGlobalAuditLogs, mw.JWTAuth)
 	e.PATCH("/databases/:name", handlers.UpdateDatabase, mw.JWTAuth)
 	e.DELETE("/databases/:name", handlers.DeleteDatabase, mw.JWTAuth)
+
 	logger.Info("starting API server", zap.String("addr", ":8080"))
-	e.Logger.Fatal(e.Start(":8080"))
+	go func() {
+		<-rootCtx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := e.Shutdown(shutdownCtx); err != nil {
+			logger.Error("failed to shutdown API server", zap.Error(err))
+		}
+	}()
+
+	if err := e.Start(":8080"); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Fatal("API server failed", zap.Error(err))
+	}
+
+	logger.Info("API server stopped")
 }
