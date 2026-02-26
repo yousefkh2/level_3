@@ -30,6 +30,9 @@ const selectedDbLogs = ref(null)
 const logsHours = ref(24)
 const selectedLogsHours = ref(24)
 
+const serviceEvents = ref([])
+const selectedDbServiceLogs = ref(null)
+
 function setToken(value) {
   token.value = value
 
@@ -237,6 +240,21 @@ async function loadLogs(name) {
   }
 }
 
+async function loadServiceLogs(name) {
+  busyAction.value = `service-logs:${name}`
+  errorMessage.value = ''
+
+  try {
+    const hours = validatedLogHours()
+    serviceEvents.value = await request(`/databases/${name}/service-logs?hours=${encodeURIComponent(hours)}`)
+    selectedDbServiceLogs.value = name
+  } catch (error) {
+    errorMessage.value = error.message
+  } finally {
+    busyAction.value = ''
+  }
+}
+
 async function loadGlobalLogs() {
   busyAction.value = 'logs:global'
   errorMessage.value = ''
@@ -419,6 +437,9 @@ onMounted(async () => {
             <button type="button" @click="loadLogs(db.name)" :disabled="busyAction === `logs:${db.name}`">
               {{ busyAction === `logs:${db.name}` ? 'Loading Logs...' : 'View Logs' }}
             </button>
+            <button type="button" @click="loadServiceLogs(db.name)" :disabled="busyAction === `service-logs:${db.name}`">
+              {{ busyAction === `service-logs:${db.name}` ? 'Loading...' : 'View Status Events' }}
+            </button>
             <button type="button" @click="deleteDatabase(db.name)" :disabled="busyAction === `delete:${db.name}`">
               {{ busyAction === `delete:${db.name}` ? 'Deleting...' : 'Delete' }}
             </button>
@@ -510,6 +531,32 @@ onMounted(async () => {
               <td class="resource">{{ log.resource || '-' }}</td>
               <td class="action">{{ log.action || '-' }}</td>
               <td class="details">{{ log.details || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section v-if="selectedDbServiceLogs" class="logs-panel">
+        <div class="header-row">
+          <h3>Status Events for {{ selectedDbServiceLogs }}</h3>
+          <button type="button" @click="selectedDbServiceLogs = null">Close</button>
+        </div>
+        <p v-if="serviceEvents.length === 0" class="no-logs">No status events recorded</p>
+        <table v-else class="logs-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Event</th>
+              <th>Previous Status</th>
+              <th>Current Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(ev, index) in serviceEvents" :key="index" class="log-row">
+              <td class="timestamp">{{ ev.timestamp || '-' }}</td>
+              <td class="action">{{ ev.event || '-' }}</td>
+              <td class="details">{{ ev.previous_status || '-' }}</td>
+              <td class="details">{{ ev.current_status || '-' }}</td>
             </tr>
           </tbody>
         </table>
