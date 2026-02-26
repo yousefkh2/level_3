@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/labstack/echo/v4"
@@ -21,6 +22,9 @@ func main() {
 	}
 	defer logger.Sync()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	k8sClient, err := config.NewKubernetesClient()
 	if err != nil {
 		log.Fatal(err)
@@ -33,6 +37,9 @@ func main() {
 		Metrics:     app.NewMetrics(),
 		LokiService: services.NewLokiService("http://loki-stack.monitoring.svc.cluster.local:3100"),
 	}
+
+	watcher := services.NewStatusWatcher(k8sClient, logger, "paas-control-plane")
+	go watcher.Start(ctx)
 
 	e := echo.New()
 	e.HideBanner = true
@@ -65,6 +72,7 @@ func main() {
 
 	e.GET("/databases/:name", handlers.GetDatabase, mw.JWTAuth)
 	e.GET("/databases/:name/logs", handlers.GetDatabaseLogs, mw.JWTAuth)
+	e.GET("/databases/:name/service-logs", handlers.GetDatabaseServiceLogs, mw.JWTAuth)
 	e.GET("/audit/logs", handlers.GetGlobalAuditLogs, mw.JWTAuth)
 	e.PATCH("/databases/:name", handlers.UpdateDatabase, mw.JWTAuth)
 	e.DELETE("/databases/:name", handlers.DeleteDatabase, mw.JWTAuth)

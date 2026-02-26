@@ -248,6 +248,30 @@ func GetDatabaseLogs(c echo.Context) error {
 	return c.JSON(http.StatusOK, events)
 }
 
+func GetDatabaseServiceLogs(c echo.Context) error {
+	appCtx := c.Get("app").(*app.App)
+	name := c.Param("name")
+
+	since, err := parseAuditLookback(c)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	events, err := appCtx.LokiService.GetServiceLogs(c.Request().Context(), name, since)
+	if err != nil {
+		appCtx.Logger.Error("failed to fetch service logs", zap.String("database", name), zap.Error(err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "failed to fetch service logs"})
+	}
+
+	if events == nil {
+		events = make([]services.ServiceEvent, 0)
+	}
+
+	appCtx.Logger.Info("service logs retrieved", zap.String("database", name), zap.Int("count", len(events)))
+
+	return c.JSON(http.StatusOK, events)
+}
+
 func GetGlobalAuditLogs(c echo.Context) error {
 	appCtx := c.Get("app").(*app.App)
 
