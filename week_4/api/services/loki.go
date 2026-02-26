@@ -21,6 +21,15 @@ type AuditEvent struct {
 	Details   string    `json:"details,omitempty"`
 }
 
+// ServiceEvent represents a parsed service status event emitted by the watcher.
+type ServiceEvent struct {
+	Timestamp      time.Time `json:"timestamp"`
+	Resource       string    `json:"resource"`
+	Event          string    `json:"event"`
+	PreviousStatus string    `json:"previous_status,omitempty"`
+	CurrentStatus  string    `json:"current_status,omitempty"`
+}
+
 type LokiService struct {
 	lokiURL string
 	client  *http.Client
@@ -52,6 +61,14 @@ func (s *LokiService) GetAuditLogs(ctx context.Context, databaseName string, sin
 func (s *LokiService) GetGlobalAuditLogs(ctx context.Context, since time.Duration) ([]AuditEvent, error) {
 	query := `{namespace="paas-control-plane"} | json | log_type="audit"`
 	return s.queryAuditLogs(ctx, query, since)
+}
+
+func (s *LokiService) GetServiceLogs(ctx context.Context, databaseName string, since time.Duration) ([]ServiceEvent, error) {
+	query := fmt.Sprintf(
+		`{namespace="paas-control-plane"} | json | log_type="service" | resource="%s"`,
+		databaseName,
+	)
+	return s.queryServiceLogs(ctx, query, since)
 }
 
 func (s *LokiService) queryAuditLogs(ctx context.Context, query string, since time.Duration) ([]AuditEvent, error) {
@@ -118,6 +135,68 @@ func (s *LokiService) queryAuditLogs(ctx context.Context, query string, since ti
 				details += fmt.Sprintf("storage=%v", storage)
 			}
 			event.Details = details
+
+			events = append(events, event)
+		}
+	}
+
+	return events, nil
+}
+
+func (s *LokiService) queryServiceLogs(ctx context.Context, query string, since time.Duration) ([]ServiceEvent, error) {
+	params := url.Values{}
+	params.Set("query", query)
+	params.Set("start", fmt.Sprintf("%d", time.Now().Add(-since).UnixNano()))
+	params.Set("end", fmt.Sprintf("%d", time.Now().UnixNano()))
+	params.Set("limit", "100")
+	params.Set("direction", "backward") // newest first
+
+	reqURL := fmt.Sprintf("%s/loki/api/v1/query_range?%s", s.lokiURL, params.Encode())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("building loki request: %w", err)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("querying loki: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("loki returned status %d", resp.StatusCode)
+	}
+
+	var lokiResp lokiQueryResponse
+	if err := json.NewDecoder(resp.Body).Decode(&lokiResp); err != nil {
+		return nil, fmt.Errorf("decoding loki response: %w", err)
+	}
+
+	var events []ServiceEvent
+	for _, result := range lokiResp.Data.Result {
+		for _, value := range result.Values {
+			if len(value) < 2 {
+				continue
+			}
+
+			var logLine map[string]interface{}
+			if err := json.Unmarshal([]byte(value[1]), &logLine); err != nil {
+				continue
+			}
+
+			ts := time.Now()
+			if tsFloat, ok := logLine["ts"].(float64); ok {
+				ts = time.Unix(int64(tsFloat), 0)
+			}
+
+			event := ServiceEvent{
+				Timestamp:      ts,
+				Resource:       stringField(logLine, "resource"),
+				Event:          stringField(logLine, "event"),
+				PreviousStatus: stringField(logLine, "previous_status"),
+				CurrentStatus:  stringField(logLine, "current_status"),
+			}
 
 			events = append(events, event)
 		}
