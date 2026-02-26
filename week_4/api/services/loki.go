@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 )
 
@@ -140,6 +141,10 @@ func (s *LokiService) queryAuditLogs(ctx context.Context, query string, since ti
 		}
 	}
 
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].Timestamp.After(events[j].Timestamp)
+	})
+
 	return events, nil
 }
 
@@ -201,6 +206,10 @@ func (s *LokiService) queryServiceLogs(ctx context.Context, query string, since 
 			events = append(events, event)
 		}
 	}
+
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].Timestamp.After(events[j].Timestamp)
+	})
 
 	return events, nil
 }
